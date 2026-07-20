@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="popup">
+      <div class="header">
+        <div class="header-left">
+          <div class="title">Search Params Sorter</div>
+          <div class="domain" id="domain"></div>
+        </div>
+        <label class="toggle-wrapper">
+          <input type="checkbox" id="toggle" class="toggle-input" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="params-list" id="paramsList"></div>
+
+      <div class="add-section" id="addSection">
+        <div class="add-btn" id="addBtn">+ 新增参数</div>
+      </div>
+
+      <div class="add-form hidden" id="addForm">
+        <div class="add-form-row">
+          <span class="add-label">Key</span>
+          <input class="add-input" id="addKey" placeholder="参数名" />
+        </div>
+        <div class="add-form-row">
+          <span class="add-label">Value</span>
+          <input class="add-input" id="addValue" placeholder="默认值（可选）" />
+        </div>
+        <div class="add-actions">
+          <button class="btn-cancel" id="addCancel">取消</button>
+          <button class="btn-confirm" id="addConfirm">添加</button>
+        </div>
+      </div>
+
+      <div class="footer">
+        <button class="save-btn" id="saveBtn">保存并应用</button>
+      </div>
+
+      <div class="empty-state hidden" id="emptyState">
+        当前 URL 无参数，可手动新增
+      </div>
+    </div>
+
+    <script src="../utils/domain.js"></script>
+    <script src="../utils/url.js"></script>
+    <script src="../utils/tab.js"></script>
+    <script src="../utils/storage.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
