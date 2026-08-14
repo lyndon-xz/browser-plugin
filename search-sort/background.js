@@ -1,4 +1,5 @@
 importScripts(
+  "utils/message.js",
   "utils/domain.js",
   "utils/url.js",
   "utils/tab.js",
@@ -18,43 +19,70 @@ const ICONS = {
   inactive: buildIconSet("inactive"),
 };
 
+function updateIcon(tabId, state) {
+  return chrome.action.setIcon({ path: ICONS[state], tabId });
+}
+
+// 只有 http(s) 页面才有可排序的查询参数，chrome://、file:// 等一律跳过
+function isSupportedURL(url) {
+  return Boolean(url) && url.startsWith("http");
+}
+
+async function readConfigForURL(url) {
+  const rootDomain = extractRootDomain(new URL(url).hostname);
+  return StorageHelper.getConfig(rootDomain);
+}
+
 async function applyConfigToTab(tabId, url) {
-  if (!url || !url.startsWith("http")) return;
+  if (!isSupportedURL(url)) return;
 
   try {
-    const rootDomain = extractRootDomain(new URL(url).hostname);
-    const config = await StorageHelper.getConfig(rootDomain);
+    const config = await readConfigForURL(url);
 
-    if (config && config.enabled) {
-      // strict=false：保留配置外的现有参数，只做排序 / 注入默认值
-      const newURL = buildSortedURL(url, config.params, false);
-      await applyURLToTab({ tabId, oldURL: url, newURL, config });
-      updateIcon(tabId, "active");
-    } else {
-      updateIcon(tabId, "inactive");
+    if (!config || !config.enabled) {
+      await updateIcon(tabId, "inactive");
+      return;
     }
+
+    const newURL = buildURLWithParamRules(
+      url,
+      config.params,
+      PARAM_MODE.keepExtra,
+    );
+    await applyURLToTab({ tabId, oldURL: url, newURL });
+    await updateIcon(tabId, "active");
   } catch (e) {
     // URL 不合法或标签页尚未就绪，属预期忽略路径，仅记录便于排查
-    console.debug("applyConfigToTab skipped:", e);
+    console.warn("applyConfigToTab skipped:", e);
   }
 }
 
-function updateIcon(tabId, state) {
-  const path = state === "active" ? ICONS.active : ICONS.inactive;
-  chrome.action.setIcon({ path, tabId });
+/*
+ * popup 保存后只刷新图标：URL 已由 popup 按新配置应用过，这里再算一遍拿到的是
+ * 保存前的旧 URL，会把用户刚剔除的参数加回去
+ */
+async function updateIconForTab(tabId, url) {
+  if (!isSupportedURL(url)) return;
+
+  try {
+    const config = await readConfigForURL(url);
+    await updateIcon(tabId, config?.enabled ? "active" : "inactive");
+  } catch (e) {
+    console.warn("updateIconForTab skipped:", e);
+  }
 }
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
-    applyConfigToTab(tabId, tab.url);
+    void applyConfigToTab(tabId, tab.url);
   }
 });
 
 chrome.runtime.onMessage.addListener((message, sender) => {
-  if (message.action === "urlChanged" && sender.tab) {
-    applyConfigToTab(sender.tab.id, message.url);
+  if (message.action === MESSAGE_ACTION.urlChanged && sender.tab) {
+    void applyConfigToTab(sender.tab.id, message.url);
   }
-  if (message.action === "configUpdated" && message.tabId) {
-    applyConfigToTab(message.tabId, message.url);
+  if (message.action === MESSAGE_ACTION.configUpdated && message.tabId) {
+    void updateIconForTab(message.tabId, message.url);
   }
 });

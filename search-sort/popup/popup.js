@@ -1,63 +1,20 @@
 (function () {
   "use strict";
 
-  const KEY_ERROR_HINT_MS = 1000;
-  const SAVE_FEEDBACK_MS = 1500;
-
-  const domainEl = document.getElementById("domain");
-  const toggleEl = document.getElementById("toggle");
-  const paramsListEl = document.getElementById("paramsList");
-  const addSection = document.getElementById("addSection");
-  const addBtn = document.getElementById("addBtn");
-  const addForm = document.getElementById("addForm");
-  const addKey = document.getElementById("addKey");
-  const addValue = document.getElementById("addValue");
-  const addConfirm = document.getElementById("addConfirm");
-  const addCancel = document.getElementById("addCancel");
-  const saveBtn = document.getElementById("saveBtn");
-  const emptyState = document.getElementById("emptyState");
-
   let currentTab = null;
   let rootDomain = "";
   // 参数项结构：{ key, defaultValue, isNew }
   let params = [];
-  let savedConfig = null;
 
-  async function init() {
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-    currentTab = tab;
+  const paramsListEl = document.getElementById("paramsList");
+  const emptyState = document.getElementById("emptyState");
+  const addSection = document.getElementById("addSection");
 
-    if (!tab.url || !tab.url.startsWith("http")) {
-      domainEl.textContent = "不支持此页面";
-      return;
-    }
-
-    const url = new URL(tab.url);
-    rootDomain = extractRootDomain(url.hostname);
-    domainEl.textContent = rootDomain;
-
-    savedConfig = await StorageHelper.getConfig(rootDomain);
-
-    if (savedConfig) {
-      toggleEl.checked = savedConfig.enabled;
-      params = savedConfig.params.map((p) => ({ ...p, isNew: false }));
-    } else {
-      toggleEl.checked = false;
-    }
-
-    // Append URL params not in config
-    const currentParams = new URLSearchParams(url.search);
-    for (const [key] of currentParams) {
-      if (!params.some((p) => p.key === key)) {
-        params.push({ key, defaultValue: null, isNew: !!savedConfig });
-      }
-    }
-
+  const dragSort = createDragSort((fromIndex, toIndex) => {
+    const [moved] = params.splice(fromIndex, 1);
+    params.splice(toIndex, 0, moved);
     renderParams();
-  }
+  });
 
   function renderParams() {
     paramsListEl.innerHTML = "";
@@ -71,6 +28,8 @@
     emptyState.classList.add("hidden");
 
     params.forEach((param, index) => {
+      const { key: paramKey, defaultValue, isNew } = param;
+
       const item = document.createElement("div");
       item.className = "param-item";
       item.draggable = true;
@@ -82,17 +41,26 @@
 
       const key = document.createElement("span");
       key.className = "param-key";
-      key.textContent = param.key;
+      key.textContent = paramKey;
 
       const value = document.createElement("span");
-      if (param.defaultValue !== null && param.defaultValue !== undefined) {
-        value.className = "param-value";
-        value.textContent = param.defaultValue;
-      } else {
+      if (defaultValue == null) {
         value.className = "param-value empty";
         value.textContent = "—";
+      } else {
+        value.className = "param-value";
+        value.textContent = defaultValue;
       }
-      value.addEventListener("click", () => startEditValue(item, param, index));
+      value.addEventListener("click", () => {
+        startEditValue({
+          item,
+          initialValue: defaultValue,
+          onCommit: (newValue) => {
+            params[index].defaultValue = newValue;
+            renderParams();
+          },
+        });
+      });
 
       const deleteBtn = document.createElement("span");
       deleteBtn.className = "delete-btn";
@@ -107,113 +75,27 @@
       item.appendChild(value);
       item.appendChild(deleteBtn);
 
-      if (param.isNew) {
+      if (isNew) {
         const badge = document.createElement("span");
         badge.className = "new-badge";
         badge.textContent = "新";
         item.appendChild(badge);
       }
 
-      // Drag events
-      item.addEventListener("dragstart", onDragStart);
-      item.addEventListener("dragover", onDragOver);
-      item.addEventListener("dragleave", onDragLeave);
-      item.addEventListener("drop", onDrop);
-      item.addEventListener("dragend", onDragEnd);
-
+      dragSort.bindItem(item);
       paramsListEl.appendChild(item);
     });
   }
 
-  // -- Drag and Drop --
-  let dragIndex = null;
+  const addBtn = document.getElementById("addBtn");
+  const addForm = document.getElementById("addForm");
+  const addKey = document.getElementById("addKey");
+  const addValue = document.getElementById("addValue");
+  const addConfirm = document.getElementById("addConfirm");
+  const addCancel = document.getElementById("addCancel");
+  // 参数名重复时红框停留的时长
+  const KEY_ERROR_HINT_MS = 1000;
 
-  function onDragStart(e) {
-    dragIndex = parseInt(e.currentTarget.dataset.index);
-    e.currentTarget.classList.add("dragging");
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function onDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    const item = e.currentTarget;
-    item.classList.add("drag-over");
-  }
-
-  function onDragLeave(e) {
-    e.currentTarget.classList.remove("drag-over");
-  }
-
-  function onDrop(e) {
-    e.preventDefault();
-    const dropIndex = parseInt(e.currentTarget.dataset.index);
-    e.currentTarget.classList.remove("drag-over");
-
-    if (dragIndex !== null && dragIndex !== dropIndex) {
-      const [moved] = params.splice(dragIndex, 1);
-      params.splice(dropIndex, 0, moved);
-      renderParams();
-    }
-  }
-
-  function onDragEnd(e) {
-    e.currentTarget.classList.remove("dragging");
-    document
-      .querySelectorAll(".drag-over")
-      .forEach((el) => el.classList.remove("drag-over"));
-  }
-
-  // -- Edit Default Value --
-  function startEditValue(item, param, index) {
-    const existingInput = item.querySelector(".param-value-input");
-    if (existingInput) return;
-
-    const valueEl = item.querySelector(".param-value");
-    valueEl.classList.add("hidden");
-
-    const input = document.createElement("input");
-    input.className = "param-value-input";
-    input.value = param.defaultValue ?? "";
-    input.placeholder = "默认值";
-
-    item.insertBefore(input, item.querySelector(".delete-btn"));
-    input.focus();
-    input.select();
-
-    let isClosed = false;
-
-    // save=true 时写回默认值并重渲染；解绑 blur 并用 isClosed 守卫，
-    // 避免 input.remove() 触发 blur 后重复执行（NotFoundError 根因）
-    function close(save) {
-      if (isClosed) return;
-      isClosed = true;
-      input.removeEventListener("blur", onBlur);
-
-      if (save) {
-        const val = input.value.trim();
-        params[index].defaultValue = val === "" ? null : val;
-      }
-
-      input.remove();
-      valueEl.classList.remove("hidden");
-
-      if (save) renderParams();
-    }
-
-    function onBlur() {
-      close(true);
-    }
-
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") close(true);
-      if (e.key === "Escape") close(false);
-    });
-
-    input.addEventListener("blur", onBlur);
-  }
-
-  // -- Add Param --
   addBtn.addEventListener("click", () => {
     addSection.classList.add("hidden");
     addForm.classList.remove("hidden");
@@ -234,10 +116,10 @@
       return;
     }
 
-    if (params.some((p) => p.key === key)) {
-      addKey.style.borderColor = "#E74C3C";
+    if (params.some((param) => param.key === key)) {
+      addKey.classList.add("error");
       setTimeout(() => {
-        addKey.style.borderColor = "";
+        addKey.classList.remove("error");
       }, KEY_ERROR_HINT_MS);
       return;
     }
@@ -270,52 +152,118 @@
     if (e.key === "Escape") addCancel.click();
   });
 
-  // -- Save --
-  saveBtn.addEventListener("click", async () => {
-    const config = {
-      enabled: toggleEl.checked,
-      params: params.map((p) => ({ key: p.key, defaultValue: p.defaultValue })),
-    };
+  const toggleEl = document.getElementById("toggle");
+  const saveBtn = document.getElementById("saveBtn");
+  const SAVE_FEEDBACK_MS = 1500;
 
-    await StorageHelper.setConfig(rootDomain, config);
+  function showSaveResult(text, isSuccess) {
+    saveBtn.textContent = text;
+    saveBtn.classList.toggle("success", isSuccess);
+    saveBtn.classList.toggle("failed", !isSuccess);
 
-    if (config.enabled) {
-      // strict=true：保存时以配置为准，剔除配置外的参数
-      const finalHref = buildSortedURL(currentTab.url, config.params, true);
-      await applyURLToTab({
-        tabId: currentTab.id,
-        oldURL: currentTab.url,
-        newURL: finalHref,
-        config,
-      });
-    }
-
-    // Notify background to update icon
-    chrome.runtime.sendMessage({
-      action: "configUpdated",
-      tabId: currentTab.id,
-      url: currentTab.url,
-    });
-
-    // Clear "new" badges
-    params = params.map((p) => ({ ...p, isNew: false }));
-
-    // Success feedback
-    saveBtn.textContent = config.enabled ? "✓ 已应用" : "✓ 已保存";
-    saveBtn.classList.add("success");
     setTimeout(() => {
       saveBtn.textContent = "保存并应用";
       saveBtn.classList.remove("success");
+      saveBtn.classList.remove("failed");
     }, SAVE_FEEDBACK_MS);
+  }
 
+  async function saveConfig() {
+    const { id: tabId, url } = currentTab;
+    const config = {
+      enabled: toggleEl.checked,
+      params: params.map((param) => ({
+        key: param.key,
+        defaultValue: param.defaultValue,
+      })),
+    };
+
+    try {
+      await StorageHelper.setConfig(rootDomain, config);
+
+      let appliedURL = url;
+      if (config.enabled) {
+        appliedURL = buildURLWithParamRules(
+          url,
+          config.params,
+          PARAM_MODE.configOnly,
+        );
+        await applyURLToTab({ tabId, oldURL: url, newURL: appliedURL });
+      }
+
+      // background 据此只刷新图标；带上应用后的 URL，它就不必自己重算
+      await chrome.runtime.sendMessage({
+        action: MESSAGE_ACTION.configUpdated,
+        tabId,
+        url: appliedURL,
+      });
+    } catch (e) {
+      console.error("saveConfig failed:", e);
+      showSaveResult("保存失败，请重试", false);
+      return;
+    }
+
+    params = params.map((param) => ({ ...param, isNew: false }));
     renderParams();
-  });
+    showSaveResult(config.enabled ? "✓ 已应用" : "✓ 已保存", true);
+  }
 
-  // -- Toggle --
+  saveBtn.addEventListener("click", () => void saveConfig());
+
   // Switch 只是 UI 状态，随保存按钮一起写入 storage，不单独触发任何动作
   toggleEl.addEventListener("change", () => {
     saveBtn.textContent = "保存并应用 •";
   });
 
-  init();
+  const domainEl = document.getElementById("domain");
+
+  async function init() {
+    try {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      currentTab = tab;
+
+      const { url } = tab;
+      if (!url || !url.startsWith("http")) {
+        domainEl.textContent = "不支持此页面";
+        toggleEl.disabled = true;
+        saveBtn.disabled = true;
+        addSection.classList.add("hidden");
+        return;
+      }
+
+      const pageURL = new URL(url);
+      rootDomain = extractRootDomain(pageURL.hostname);
+      domainEl.textContent = rootDomain;
+
+      const savedConfig = await StorageHelper.getConfig(rootDomain);
+      if (savedConfig) {
+        toggleEl.checked = savedConfig.enabled;
+        params = savedConfig.params.map((param) => ({
+          ...param,
+          isNew: false,
+        }));
+      }
+
+      /*
+       * 已保存过配置的域名才给 URL 上多出来的参数打「新」标，
+       * 让用户看出哪些是这次才冒出来、还没纳入配置的
+       */
+      for (const [key] of pageURL.searchParams) {
+        if (!params.some((param) => param.key === key)) {
+          params.push({ key, defaultValue: null, isNew: Boolean(savedConfig) });
+        }
+      }
+
+      renderParams();
+    } catch (e) {
+      console.error("popup init failed:", e);
+      domainEl.textContent = "读取配置失败";
+      saveBtn.disabled = true;
+    }
+  }
+
+  void init();
 })();
