@@ -118,11 +118,6 @@ body {
   transform: translateX(20px);
 }
 
-.toggle-input:disabled + .toggle-slider {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-
 /*
  * Params List
  * 高度不写死：撑到 .popup 的上限为止，之后由 min-height: 0 让它收缩、内部滚动。
@@ -405,17 +400,35 @@ body {
   background: var(--danger);
 }
 
-.save-btn:disabled {
-  cursor: not-allowed;
-  background: var(--border-strong);
+/* State Box：无参数 / 页面不支持 / 读取失败共用的占位说明 */
+.state-box {
+  padding: 32px 28px;
+  text-align: center;
 }
 
-/* Empty State */
-.empty-state {
-  padding: 30px 20px;
+.state-title {
   font-size: 13px;
-  color: var(--text-muted);
-  text-align: center;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.state-desc {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-placeholder);
+}
+
+/*
+ * 页面本身没有可配置的东西时（非 http(s)、配置读不出来），
+ * 把参数区与所有操作入口一并收起，只留说明——留一个点不动的灰按钮更让人困惑
+ */
+.popup[data-state="blocked"] .toggle-wrapper,
+.popup[data-state="blocked"] .params-list,
+.popup[data-state="blocked"] .add-section,
+.popup[data-state="blocked"] .add-form,
+.popup[data-state="blocked"] .footer {
+  display: none;
 }
 
 /* Utility */

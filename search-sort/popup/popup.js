@@ -7,8 +7,29 @@
   let params = [];
 
   const paramsListEl = document.getElementById("paramsList");
-  const emptyState = document.getElementById("emptyState");
   const addSection = document.getElementById("addSection");
+  const stateBox = document.getElementById("stateBox");
+  const stateTitle = document.getElementById("stateTitle");
+  const stateDesc = document.getElementById("stateDesc");
+
+  /*
+   * 无参数、页面不支持、配置读取失败共用这一块占位说明，同一时刻只可能有一种。
+   * 它顶替参数列表的位置，列表为空时连带把列表容器藏掉——否则空容器的 padding
+   * 与下边框会在头部下面留一条空白带
+   */
+  function showState(stateText) {
+    const { title, desc } = stateText;
+
+    stateTitle.textContent = title;
+    stateDesc.textContent = desc;
+    stateBox.classList.remove("hidden");
+    paramsListEl.classList.add("hidden");
+  }
+
+  function hideState() {
+    stateBox.classList.add("hidden");
+    paramsListEl.classList.remove("hidden");
+  }
 
   const dragSort = createDragSort((fromIndex, toIndex) => {
     const [moved] = params.splice(fromIndex, 1);
@@ -20,12 +41,15 @@
     paramsListEl.innerHTML = "";
 
     if (params.length === 0) {
-      emptyState.classList.remove("hidden");
+      showState({
+        title: "当前 URL 没有查询参数",
+        desc: "可以手动新增，给参数设上默认值",
+      });
       addSection.classList.remove("hidden");
       return;
     }
 
-    emptyState.classList.add("hidden");
+    hideState();
 
     params.forEach((param, index) => {
       const { key: paramKey, defaultValue, isNew } = param;
@@ -215,7 +239,14 @@
     saveBtn.textContent = "保存并应用 •";
   });
 
+  const popupEl = document.getElementById("popup");
   const domainEl = document.getElementById("domain");
+
+  // 没有可配置对象时，参数区、新增区、保存按钮与开关一并由 CSS 收起，只留说明
+  function blockConfiguring(stateText) {
+    popupEl.dataset.state = "blocked";
+    showState(stateText);
+  }
 
   async function init() {
     try {
@@ -227,10 +258,10 @@
 
       const { url } = tab;
       if (!url || !url.startsWith("http")) {
-        domainEl.textContent = "不支持此页面";
-        toggleEl.disabled = true;
-        saveBtn.disabled = true;
-        addSection.classList.add("hidden");
+        blockConfiguring({
+          title: "不支持这个页面",
+          desc: "只能在 http(s) 页面上排序查询参数",
+        });
         return;
       }
 
@@ -260,8 +291,10 @@
       renderParams();
     } catch (e) {
       console.error("popup init failed:", e);
-      domainEl.textContent = "读取配置失败";
-      saveBtn.disabled = true;
+      blockConfiguring({
+        title: "读取配置失败",
+        desc: "关掉弹窗重新打开试试",
+      });
     }
   }
 
