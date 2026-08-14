@@ -1,25 +1,40 @@
-# Dependencies
+# 依赖
 node_modules/
 
-# Build & cache
+# 只用 pnpm，避免多包管理器混用
+package-lock.json
+yarn.lock
+bun.lockb
+
+# 构建产物
 dist/
-coverage/
-*.tsbuildinfo
-.eslintcache
+build/
+
+# 缓存
 .cache/
+.eslintcache
+*.tsbuildinfo
 
-# Environment
-.env*
-!.env.example
+# 测试
+coverage/
 
-# Logs
+# 日志
 *.log
 
-# Editor & OS
-.vscode/launch.json
-.vscode/tasks.json
+# 环境变量与密钥
+.env*
+!.env*.example
+
+# 编辑器
 .idea/
-.agent/
-.cursor/
+.vscode/
+
+# 操作系统
 .DS_Store
 Thumbs.db
+
+# AI 工具
+.agent/
+.claude/
+.cursor/
+.kiro/
