@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>review-lens · 弹窗原型</title>
+    <style>
+      :root {
+        --ink: #2f3a52;
+        --ink-soft: #5a6579;
+        --paper: #f4f6fc;
+        --card: #ffffff;
+        --line: #e4e8f2;
+        --head-bg: #eef1fb;
+        --head-fg: #2f3a52;
+        --head-sub: #6b7793;
+        --then: #a8710f;
+        --then-bg: #fef6e3;
+        --now: #147b5c;
+        --now-bg: #e7f7ef;
+        --mark: #4f46e5;
+        --mark-bg: #eef0ff;
+        --dim: #8a93a8;
+        --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, "JetBrains Mono", Consolas,
+          monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        width: 400px;
+        height: 560px;
+        margin: 0;
+        font-family: var(--ui);
+        color: var(--ink);
+        background: var(--paper);
+      }
+
+      header {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        padding: 12px 14px;
+        color: var(--head-fg);
+        background: var(--head-bg);
+        border-bottom: 1px solid var(--line);
+      }
+      header .brand {
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+      header .tally {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--head-sub);
+      }
+      header button {
+        margin-left: auto;
+        padding: 4px 9px;
+        font-family: var(--ui);
+        font-size: 11.5px;
+        color: var(--ink-soft);
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      header button:hover {
+        color: var(--mark);
+        border-color: #b9bcf7;
+      }
+
+      .filters {
+        display: flex;
+        gap: 6px;
+        padding: 10px 14px;
+        overflow-x: auto;
+        background: var(--card);
+        border-bottom: 1px solid var(--line);
+      }
+      .chip {
+        padding: 4px 9px;
+        font-family: var(--ui);
+        font-size: 11.5px;
+        color: var(--ink-soft);
+        white-space: nowrap;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        cursor: pointer;
+      }
+      .chip[aria-pressed="true"] {
+        color: #fff;
+        background: var(--mark);
+        border-color: var(--mark);
+      }
+      .chip .n {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        opacity: 0.7;
+      }
+
+      .list {
+        flex: 1;
+        padding: 10px;
+        overflow-y: auto;
+      }
+
+      .card {
+        margin-bottom: 8px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .card-top {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        padding: 9px 10px 7px;
+      }
+      .card-symbol {
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .card-repo {
+        overflow: hidden;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: var(--dim);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .card-note {
+        margin: 0 10px 9px;
+        font-size: 12.5px;
+        line-height: 1.6;
+        color: var(--ink-soft);
+      }
+
+      /* 卡片上的双时点缩略：与抽屉的琥珀/青瓷同一套语义 */
+      .mini {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        line-height: 1.6;
+        background: var(--line);
+        border-top: 1px solid var(--line);
+      }
+      .mini > div {
+        padding: 6px 8px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .mini .m-then {
+        color: #7c4705;
+        background: var(--then-bg);
+      }
+      .mini .m-now {
+        color: #0a5f52;
+        background: var(--now-bg);
+      }
+      .mini .tag {
+        display: block;
+        font-family: var(--ui);
+        font-size: 10px;
+        opacity: 0.8;
+      }
+
+      .card-foot {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        padding: 7px 10px;
+        border-top: 1px solid var(--line);
+      }
+      .card-foot .when {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--dim);
+      }
+      .card-foot .spacer {
+        margin-left: auto;
+      }
+      .mini-btn {
+        padding: 3px 8px;
+        font-family: var(--ui);
+        font-size: 11px;
+        color: var(--ink-soft);
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .mini-btn:hover {
+        border-color: #b6bfcc;
+      }
+      .mini-btn.danger:hover {
+        color: #a1180f;
+        border-color: #e8b4af;
+      }
+
+      footer {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 10px 12px;
+        background: var(--card);
+        border-top: 1px solid var(--line);
+      }
+      footer .hint {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--dim);
+      }
+      .btn {
+        padding: 6px 12px;
+        font-family: var(--ui);
+        font-size: 12.5px;
+        color: var(--ink);
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .btn.primary {
+        margin-left: auto;
+        color: #fff;
+        background: var(--mark);
+        border-color: var(--mark);
+      }
+
+      /* 空态 */
+      .empty {
+        display: grid;
+        place-content: center;
+        gap: 10px;
+        height: 100%;
+        padding: 24px;
+        text-align: center;
+      }
+      .empty .rail {
+        justify-self: center;
+        width: 90px;
+        height: 3px;
+        background: linear-gradient(90deg, var(--then), var(--now));
+        border-radius: 2px;
+      }
+      .empty strong {
+        font-size: 13.5px;
+      }
+      .empty p {
+        max-width: 30ch;
+        margin: 0 auto;
+        font-size: 12.5px;
+        line-height: 1.7;
+        color: var(--ink-soft);
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="brand">review-lens</span>
+      <span class="tally">14 张卡片 · 3 个仓库</span>
+      <button id="toggle-empty">看空态</button>
+    </header>
+
+    <div class="filters">
+      <button class="chip" aria-pressed="true">全部 <span class="n">14</span></button>
+      <button class="chip" aria-pressed="false">buyoutservice <span class="n">6</span></button>
+      <button class="chip" aria-pressed="false">htl-order <span class="n">5</span></button>
+      <button class="chip" aria-pressed="false">hotel-common <span class="n">3</span></button>
+    </div>
+
+    <div class="list" id="list">
+      <article class="card">
+        <div class="card-top">
+          <span class="card-symbol">getContractSummary()</span>
+          <span class="card-repo">buyoutservice · BuyoutSettleMentService.java</span>
+        </div>
+        <p class="card-note">重试封装失败时 getResponse() 是 null，取值前要么判 getSuccess()，要么用 Optional 兜一个空对象。</p>
+        <div class="mini">
+          <div class="m-then"><span class="tag">评论时</span>responseEntity.getResponse().getContractSummaryList()</div>
+          <div class="m-now"><span class="tag">修正后</span>Optional.ofNullable(responseEntity.getResponse())…</div>
+        </div>
+        <div class="card-foot">
+          <span class="when">存于 2 天前 · cp.tang</span>
+          <span class="spacer"></span>
+          <button class="mini-btn">回到 MR</button>
+          <button class="mini-btn">编辑笔记</button>
+          <button class="mini-btn danger">删除</button>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-top">
+          <span class="card-symbol">buildOrderSnapshot()</span>
+          <span class="card-repo">htl-order · OrderSnapshotService.java</span>
+        </div>
+        <p class="card-note">循环里 new SimpleDateFormat，线程不安全且每次分配；换 DateTimeFormatter 常量。</p>
+        <div class="mini">
+          <div class="m-then"><span class="tag">评论时</span>new SimpleDateFormat("yyyy-MM-dd").format(date)</div>
+          <div class="m-now"><span class="tag">修正后</span>DATE_FMT.format(date)</div>
+        </div>
+        <div class="card-foot">
+          <span class="when">存于 5 天前 · l.wang</span>
+          <span class="spacer"></span>
+          <button class="mini-btn">回到 MR</button>
+          <button class="mini-btn">编辑笔记</button>
+          <button class="mini-btn danger">删除</button>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-top">
+          <span class="card-symbol">queryRoomList()</span>
+          <span class="card-repo">hotel-common · RoomQueryFacade.java</span>
+        </div>
+        <p class="card-note">catch 里只打日志就返回空列表，调用方分不清「没房」和「查失败」。</p>
+        <div class="mini">
+          <div class="m-then"><span class="tag">评论时</span>catch (Exception e) { return Collections.emptyList(); }</div>
+          <div class="m-now"><span class="tag">修正后</span>至今未改动</div>
+        </div>
+        <div class="card-foot">
+          <span class="when">存于 1 周前 · cp.tang</span>
+          <span class="spacer"></span>
+          <button class="mini-btn">回到 MR</button>
+          <button class="mini-btn">编辑笔记</button>
+          <button class="mini-btn danger">删除</button>
+        </div>
+      </article>
+    </div>
+
+    <div class="list" id="empty" hidden>
+      <div class="empty">
+        <span class="rail"></span>
+        <strong>还没有卡片</strong>
+        <p>在 GitLab 的代码评论旁点「解读」，看懂一条就存下来，这里会攒成一份自己的评审笔记。</p>
+      </div>
+    </div>
+
+    <footer>
+      <span class="hint">存储在本地，不上传</span>
+      <button class="btn primary">导出 Markdown</button>
+    </footer>
+
+    <script>
+      const list = document.getElementById("list");
+      const empty = document.getElementById("empty");
+      document.getElementById("toggle-empty").addEventListener("click", (event) => {
+        const showEmpty = list.hidden;
+        list.hidden = !showEmpty;
+        empty.hidden = showEmpty;
+        event.currentTarget.textContent = showEmpty ? "看空态" : "看卡片列表";
+      });
+
+      document.querySelectorAll(".chip").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          document.querySelectorAll(".chip").forEach((other) => {
+            other.setAttribute("aria-pressed", String(other === chip));
+          });
+        });
+      });
+    </script>
+  </body>
+</html>

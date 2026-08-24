@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>review-lens · 抽屉原型</title>
+    <style>
+      :root {
+        --ink: #2f3a52;
+        --ink-soft: #5a6579;
+        --paper: #f4f6fc;
+        --card: #ffffff;
+        --line: #e4e8f2;
+
+        --head-bg: #eef1fb;
+        --head-fg: #2f3a52;
+        --head-sub: #6b7793;
+
+        --then: #a8710f;
+        --then-bg: #fef6e3;
+        --now: #147b5c;
+        --now-bg: #e7f7ef;
+        --mark: #4f46e5;
+        --mark-bg: #eef0ff;
+
+        --code-key: #a3306a;
+        --code-type: #0b6e99;
+        --code-str: #0a7a5a;
+        --code-dim: #8a93a8;
+
+        --radius: 10px;
+
+        --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, "JetBrains Mono", Consolas,
+          monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--ui);
+        color: var(--ink);
+        background: #fff;
+      }
+
+      /* ── 原型控制条：仅用于演示状态切换，实现中不存在 ───────────── */
+      .proto-bar {
+        position: fixed;
+        left: 12px;
+        bottom: 12px;
+        z-index: 99;
+        display: flex;
+        gap: 6px;
+        padding: 8px;
+        background: var(--ink);
+        border-radius: 8px;
+        box-shadow: 0 6px 20px rgb(27 36 48 / 28%);
+      }
+      .proto-bar span {
+        align-self: center;
+        margin-right: 4px;
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        color: #8b95a5;
+      }
+      .proto-bar button {
+        padding: 5px 10px;
+        font-family: var(--ui);
+        font-size: 12px;
+        color: #cfd6e0;
+        background: transparent;
+        border: 1px solid #3b4756;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .proto-bar button[aria-pressed="true"] {
+        color: #fff;
+        background: #3b4756;
+        border-color: #55647a;
+      }
+
+      /* ── 宿主页仿真（GitLab 讨论区） ─────────────────────────── */
+      .host {
+        max-width: 900px;
+        padding: 28px 24px 120px;
+      }
+      .host-thread {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .host-thread-head {
+        padding: 10px 14px;
+        font-size: 13px;
+        color: var(--ink-soft);
+        background: #fafbfc;
+        border-bottom: 1px solid var(--line);
+      }
+      .host-file {
+        display: flex;
+        justify-content: space-between;
+        padding: 9px 14px;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        border-bottom: 1px solid var(--line);
+      }
+      .host-diff {
+        padding: 8px 0;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        line-height: 1.7;
+        background: #eef8f0;
+      }
+      .host-diff div {
+        padding: 0 14px;
+        color: #2f4032;
+        white-space: pre;
+      }
+      .host-comment {
+        display: grid;
+        grid-template-columns: 32px 1fr auto;
+        gap: 10px;
+        padding: 12px 14px;
+        border-top: 1px solid var(--line);
+      }
+      .avatar {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #fff;
+        background: #7a8493;
+        border-radius: 50%;
+      }
+      .avatar.b {
+        background: var(--then);
+      }
+      .avatar.c {
+        background: var(--now);
+      }
+      .host-comment-meta {
+        margin-bottom: 3px;
+        font-size: 12px;
+        color: var(--code-dim);
+      }
+      .host-comment-meta b {
+        color: var(--ink);
+      }
+      .host-comment p {
+        margin: 0;
+        font-size: 13.5px;
+        line-height: 1.65;
+      }
+
+      /* 入口按钮：对齐 GitLab 自身 icon button 的 28px 尺寸，不占额外行高 */
+      .lens-entry {
+        display: inline-flex;
+        gap: 5px;
+        align-items: center;
+        align-self: start;
+        height: 28px;
+        padding: 0 9px;
+        font-family: var(--ui);
+        font-size: 12px;
+        color: var(--ink-soft);
+        white-space: nowrap;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .lens-entry:hover {
+        color: var(--mark);
+        background: var(--mark-bg);
+        border-color: #b9bcf7;
+      }
+      .lens-entry::before {
+        width: 3px;
+        height: 12px;
+        background: linear-gradient(var(--then) 50%, var(--now) 50%);
+        border-radius: 2px;
+        content: "";
+      }
+
+      /* ── 抽屉 ────────────────────────────────────────────── */
+      .drawer {
+        position: fixed;
+        inset: 0 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        width: min(820px, 52vw);
+        background: var(--paper);
+        border-left: 1px solid #c9d0da;
+        box-shadow: -14px 0 40px rgb(27 36 48 / 12%);
+      }
+      /* 左边缘拖拽把手：宽度是读代码的核心变量，交给用户拖并记住 */
+      .drawer-grip {
+        position: absolute;
+        inset: 0 auto 0 -3px;
+        width: 6px;
+        cursor: col-resize;
+      }
+      .drawer-grip:hover {
+        background: linear-gradient(180deg, var(--then), var(--now));
+      }
+
+      .drawer-head {
+        display: flex;
+        gap: 12px;
+        align-items: baseline;
+        padding: 12px 16px;
+        color: var(--head-fg);
+        background: var(--head-bg);
+        border-bottom: 1px solid var(--line);
+      }
+      .drawer-head .path {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--head-sub);
+      }
+      .drawer-head .symbol {
+        font-family: var(--mono);
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--head-fg);
+      }
+      .drawer-close {
+        margin-left: auto;
+        font-size: 18px;
+        line-height: 1;
+        color: var(--head-sub);
+        background: none;
+        border: 0;
+        cursor: pointer;
+      }
+
+      /* 评论卡 */
+      .comment-card {
+        padding: 14px 16px;
+        background: var(--card);
+        border-bottom: 1px solid var(--line);
+      }
+      .comment-card-top {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 7px;
+      }
+      .comment-card-top .name {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .comment-card-top .when {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--code-dim);
+      }
+      .comment-card-top .badge {
+        padding: 1px 6px;
+        font-size: 10.5px;
+        color: var(--then);
+        background: var(--then-bg);
+        border-radius: 9px;
+      }
+      .comment-card p {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.8;
+      }
+      /* 评论正文里的标识符：可点，跳到代码中的位置 */
+      .ident {
+        padding: 1px 4px;
+        font-family: var(--mono);
+        font-size: 13px;
+        color: #3730a3;
+        background: var(--mark-bg);
+        border-bottom: 1px solid #b9bcf7;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      .ident:hover {
+        background: #e0e2ff;
+      }
+
+      /* 回复串：紧跟首条评论，同一张白卡内用细线隔开 */
+      .replies {
+        padding: 10px 16px 14px;
+        background: var(--card);
+        border-bottom: 1px solid var(--line);
+      }
+      .replies-head {
+        margin-bottom: 6px;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.04em;
+        color: var(--code-dim);
+      }
+      /* 左侧竖线 + 缩进：一眼看出这些是挂在上面那条评论下的回应 */
+      .reply {
+        padding: 9px 0 9px 12px;
+        background: #fafbff;
+        border-left: 2px solid #c7cbf5;
+        border-radius: 0 4px 4px 0;
+      }
+      .reply + .reply {
+        margin-top: 2px;
+      }
+      .reply-top {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        margin-bottom: 5px;
+      }
+      .reply-top .name {
+        font-size: 12.5px;
+        font-weight: 600;
+      }
+      .reply-top .when {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: var(--code-dim);
+      }
+      .reply p {
+        margin: 0;
+        font-size: 13.5px;
+        line-height: 1.8;
+      }
+
+      /* 签名元素：时间脊 —— 标签行与竖脊共用同一套三列栅格，视觉上是一条贯穿的轴 */
+      .spine {
+        display: grid;
+        grid-template-columns: 1fr 6px 1fr;
+        align-items: center;
+        padding: 12px 16px 0;
+      }
+      .spine-side {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .spine-side.now {
+        justify-content: flex-end;
+      }
+      .spine-tag {
+        font-size: 11.5px;
+        font-weight: 600;
+      }
+      .spine-side.then .spine-tag {
+        color: var(--then);
+      }
+      .spine-side.now .spine-tag {
+        color: var(--now);
+      }
+      .spine-who {
+        font-size: 12px;
+        color: var(--ink-soft);
+      }
+      .spine-who b {
+        color: var(--ink);
+      }
+
+      /* 双栏代码区 */
+      .panes {
+        display: grid;
+        flex: 0 1 auto;
+        grid-template-columns: 1fr 6px 1fr;
+        min-height: 0;
+        max-height: calc(100vh - 330px);
+        margin: 8px 16px 0;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .pane-spine {
+        background: linear-gradient(180deg, var(--then), var(--now));
+      }
+
+      /* 上下堆叠视图：每栏拿到全宽，长 Java 行基本不折行 */
+      .drawer.stacked .spine,
+      .drawer.failed .spine {
+        display: none;
+      }
+      .drawer.stacked .panes {
+        grid-template-rows: auto 8px auto;
+        grid-template-columns: 1fr;
+        margin-top: 12px;
+      }
+      /* 横向铺开时渐变会被过渡色摊淡，改两色硬分割 */
+      .drawer.stacked .pane-spine {
+        background: linear-gradient(
+          90deg,
+          var(--then) 0 47%,
+          var(--now) 53% 100%
+        );
+      }
+
+      .view-switch {
+        display: flex;
+        gap: 2px;
+        padding: 2px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+      }
+      .view-switch button {
+        padding: 3px 9px;
+        font-family: var(--ui);
+        font-size: 11.5px;
+        color: var(--ink-soft);
+        background: none;
+        border: 0;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      .view-switch button[aria-pressed="true"] {
+        color: #fff;
+        background: var(--mark);
+      }
+      .pane {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        background: var(--card);
+      }
+      .pane-head {
+        display: flex;
+        justify-content: space-between;
+        padding: 7px 10px;
+        font-family: var(--mono);
+        font-size: 11px;
+        border-bottom: 1px solid var(--line);
+      }
+      .pane.then .pane-head {
+        color: #7c4705;
+        background: var(--then-bg);
+      }
+      .pane.now .pane-head {
+        color: #0a5f52;
+        background: var(--now-bg);
+      }
+      .code {
+        flex: 1;
+        overflow: auto;
+        font-family: var(--mono);
+        font-size: 14px;
+        line-height: 1.85;
+      }
+      .code-line {
+        display: grid;
+        grid-template-columns: 42px 1fr;
+        border-left: 3px solid transparent;
+      }
+      .code-line .ln {
+        padding-right: 10px;
+        color: #aab3c0;
+        text-align: right;
+        user-select: none;
+      }
+      /* 长 Java 行在两栏里必然超宽：软换行 + 悬挂缩进，让续行一眼看出是同一行 */
+      .code-line .src {
+        padding-right: 12px;
+        padding-left: 1.8em;
+        overflow-wrap: anywhere;
+        text-indent: -1.8em;
+        white-space: pre-wrap;
+      }
+      .code-line.added {
+        background: var(--now-bg);
+      }
+      .code-line.removed {
+        background: var(--then-bg);
+      }
+      /* 锚点行走「左脊」通道，与增删的「底色」通道互不覆盖 */
+      .code-line.anchor {
+        border-left-color: var(--mark);
+      }
+      .code-line.anchor .ln {
+        font-weight: 700;
+        color: var(--mark);
+      }
+      /* 评论真正所指的行：虚线框，与锚点行区分 */
+      .code-line.related .src {
+        outline: 1px dashed #a5a8f5;
+        outline-offset: -1px;
+      }
+      .k {
+        color: var(--code-key);
+      }
+      .t {
+        color: var(--code-type);
+      }
+      .s {
+        color: var(--code-str);
+      }
+      .c {
+        color: var(--code-dim);
+      }
+      .hit {
+        background: #e0e2ff;
+        border-radius: 2px;
+      }
+
+      /* 右栏空态：这处至今未改动 */
+      .untouched {
+        display: grid;
+        flex: 1;
+        place-content: center;
+        gap: 8px;
+        padding: 24px;
+        text-align: center;
+      }
+      .untouched strong {
+        font-size: 13.5px;
+      }
+      .untouched p {
+        max-width: 34ch;
+        margin: 0 auto;
+        font-size: 12.5px;
+        line-height: 1.7;
+        color: var(--ink-soft);
+      }
+      .untouched button {
+        justify-self: center;
+        padding: 6px 12px;
+        font-size: 12px;
+        color: var(--now);
+        background: #fff;
+        border: 1px solid var(--now);
+        border-radius: 5px;
+        cursor: pointer;
+      }
+
+      /* 失败态 */
+      .failure {
+        display: grid;
+        flex: 1;
+        place-content: center;
+        gap: 10px;
+        padding: 32px;
+        text-align: center;
+      }
+      .failure-code {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        color: var(--then);
+      }
+      .failure strong {
+        font-size: 15px;
+      }
+      .failure p {
+        max-width: 40ch;
+        margin: 0 auto;
+        font-size: 13px;
+        line-height: 1.75;
+        color: var(--ink-soft);
+      }
+      .failure-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+      }
+
+      /* 底栏 */
+      .drawer-foot {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-top: auto;
+        padding: 10px 16px;
+        background: var(--card);
+        border-top: 1px solid var(--line);
+      }
+      .thread-nav {
+        display: flex;
+        gap: 2px;
+        align-items: center;
+        padding: 2px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+      }
+      .thread-nav button {
+        width: 22px;
+        height: 22px;
+        font-size: 13px;
+        line-height: 1;
+        color: var(--ink-soft);
+        background: none;
+        border: 0;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      .thread-nav button:hover {
+        color: var(--mark);
+        background: var(--mark-bg);
+      }
+      .thread-nav .at {
+        padding: 0 3px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--dim, #7a8493);
+      }
+      .btn {
+        padding: 6px 12px;
+        font-family: var(--ui);
+        font-size: 12.5px;
+        color: var(--ink);
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .btn:hover {
+        border-color: #b6bfcc;
+      }
+      .btn.primary {
+        color: #fff;
+        background: var(--mark);
+        border-color: var(--mark);
+      }
+      .btn .count {
+        margin-left: 4px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--mark);
+      }
+      .drawer-foot .spacer {
+        margin-left: auto;
+      }
+      .drawer-foot .hint {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: #aab3c0;
+      }
+
+      /* 相关行浮层 */
+      .related-pop {
+        position: absolute;
+        right: 16px;
+        bottom: 56px;
+        width: 340px;
+        padding: 6px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        box-shadow: 0 10px 28px rgb(27 36 48 / 16%);
+      }
+      .related-pop h4 {
+        margin: 6px 8px 8px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        color: var(--code-dim);
+      }
+      .related-item {
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        gap: 8px;
+        padding: 7px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .related-item:hover {
+        background: var(--mark-bg);
+      }
+      .related-item .rl {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--mark);
+        text-align: right;
+      }
+      .related-item .rs {
+        overflow: hidden;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .related-item .why {
+        grid-column: 2;
+        font-size: 11px;
+        color: var(--code-dim);
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ════ 宿主页仿真：GitLab MR 讨论页 ════ -->
+    <main class="host">
+      <div class="host-thread">
+        <div class="host-thread-head">
+          <b>cp.tang</b> 开启有关旧版本差异的主题 3 个月前 · 由 <b>xiunn</b> 已解决 于 2 个月前
+        </div>
+        <div class="host-file">
+          <span>buyoutservice-service/…/common/BuyoutSettleMentService.java</span>
+          <span style="color: #7a8493">0 → 100644</span>
+        </div>
+        <div class="host-diff">
+          <div>29 + public List&lt;ContractSummary&gt; getContractSummary(…) throws Exception {</div>
+          <div>30 +     String title = "getContractSummary";</div>
+          <div>35 +     Logger.info(title, "req: " + JsonUtil.toJsonString(request));</div>
+          <div>37 +     ResponseEntity&lt;…&gt; responseEntity = ReTryService.doIoService(…)</div>
+        </div>
+        <div class="host-comment">
+          <div class="avatar b">C</div>
+          <div>
+            <div class="host-comment-meta"><b>cp.tang</b> · 3 个月前</div>
+            <p>
+              用 ReTryService.doIoService 的时候需要注意一个问题：发生 NullPointerException ｜
+              IsolationException ｜ ShortCircuitException 等异常时，不会在重试，responseEntity.getResponse()
+              是个空值，所以在使用 responseEntity.getResponse() 前应该需要判断 responseEntity.getSuccess() == true
+            </p>
+          </div>
+          <button class="lens-entry">解读</button>
+        </div>
+        <div class="host-comment">
+          <div class="avatar c">X</div>
+          <div>
+            <div class="host-comment-meta"><b>xiunn</b> · 2 个月前</div>
+            <p>加了 Optional.ofNullable(responseEntity.getResponse()).orElse(new GetContractSummaryResponseType())</p>
+          </div>
+          <button class="lens-entry">解读</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ════ 抽屉 ════ -->
+    <aside class="drawer">
+      <div class="drawer-grip" title="拖动调整宽度"></div>
+      <header class="drawer-head">
+        <span class="symbol">getContractSummary()</span>
+        <span class="path">BuyoutSettleMentService.java</span>
+        <button class="drawer-close" aria-label="关闭">✕</button>
+      </header>
+
+      <section class="comment-card">
+        <div class="comment-card-top">
+          <span class="avatar b" style="width: 22px; height: 22px; font-size: 10px">C</span>
+          <span class="name">cp.tang</span>
+          <span class="when">2026-05-19</span>
+          <span class="badge">旧版本差异</span>
+        </div>
+        <p>
+          用 <span class="ident">ReTryService.doIoService</span> 的时候需要注意一个问题：发生
+          NullPointerException ｜ IsolationException ｜ ShortCircuitException 等异常时，不会在重试，<span
+            class="ident"
+            >responseEntity.getResponse()</span
+          >
+          是个空值，所以在使用 <span class="ident">responseEntity.getResponse()</span> 前应该需要判断
+          <span class="ident">responseEntity.getSuccess() == true</span>
+        </p>
+      </section>
+
+      <section class="replies">
+        <div class="replies-head">回复 · 2 条</div>
+        <div class="reply">
+          <div class="reply-top">
+            <span class="name">xiunn</span>
+            <span class="when">2 个月前 · 作者</span>
+          </div>
+          <p>加了 Optional.ofNullable(responseEntity.getResponse()).orElse(new GetContractSummaryResponseType())</p>
+        </div>
+        <div class="reply">
+          <div class="reply-top">
+            <span class="name">cp.tang</span>
+            <span class="when">2 个月前</span>
+          </div>
+          <p>可以，这样兜住了空值。不过要确认下游拿到空对象时的分支也是对的。</p>
+        </div>
+      </section>
+
+      <!-- 签名元素：时间脊 -->
+      <div class="spine">
+        <div class="spine-side then">
+          <span class="spine-tag">评论时</span>
+          <span class="spine-who"><b>cp.tang</b> · 3 个月前</span>
+        </div>
+        <div></div>
+        <div class="spine-side now">
+          <span class="spine-who"><b>xiunn</b> · 2 个月前</span>
+          <span class="spine-tag">修正后</span>
+        </div>
+      </div>
+
+      <!-- 主态：并排对比 -->
+      <div class="panes" id="panes-compare">
+        <div class="pane then">
+          <div class="pane-head">
+            <span>b7f14c2 · cp.tang 评论时</span>
+            <span>行 29–41</span>
+          </div>
+          <div class="code">
+            <div class="code-line">
+              <span class="ln">29</span><span class="src">  <span class="k">public</span> <span class="t">List</span>&lt;<span class="t">ContractSummary</span>&gt; getContractSummary(</span>
+            </div>
+            <div class="code-line">
+              <span class="ln">30</span><span class="src">      <span class="t">List</span>&lt;<span class="t">ParamEntity</span>&gt; paramEntityList, <span class="t">Integer</span> pageIndex) {</span>
+            </div>
+            <div class="code-line">
+              <span class="ln">31</span><span class="src">    <span class="t">String</span> title = <span class="s">"getContractSummary"</span>;</span>
+            </div>
+            <div class="code-line">
+              <span class="ln">35</span><span class="src">    Logger.info(title, <span class="s">"req: "</span> + JsonUtil.toJsonString(request));</span>
+            </div>
+            <div class="code-line"><span class="ln">36</span><span class="src"> </span></div>
+            <div class="code-line anchor">
+              <span class="ln">37</span><span class="src">    <span class="t">ResponseEntity</span>&lt;<span class="t">GetContractSummaryResponseType</span>&gt; responseEntity =</span>
+            </div>
+            <div class="code-line anchor">
+              <span class="ln">38</span><span class="src">        <span class="hit">ReTryService.doIoService</span>(<span class="t">Exception</span>.class, retryContext -&gt; {</span>
+            </div>
+            <div class="code-line">
+              <span class="ln">39</span><span class="src">          <span class="k">return</span> soaClient.getContractSummary(request);</span>
+            </div>
+            <div class="code-line"><span class="ln">40</span><span class="src">        });</span></div>
+            <div class="code-line related">
+              <span class="ln">41</span><span class="src">    <span class="k">return</span> <span class="hit">responseEntity.getResponse()</span>.getContractSummaryList();</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pane-spine"></div>
+
+        <div class="pane now">
+          <div class="pane-head">
+            <span>d19a8e0 · xiunn 修正后</span>
+            <span>行 37–44</span>
+          </div>
+          <div class="code">
+            <div class="code-line">
+              <span class="ln">37</span><span class="src">    <span class="t">ResponseEntity</span>&lt;<span class="t">GetContractSummaryResponseType</span>&gt; responseEntity =</span>
+            </div>
+            <div class="code-line">
+              <span class="ln">38</span><span class="src">        ReTryService.doIoService(<span class="t">Exception</span>.class, retryContext -&gt; {</span>
+            </div>
+            <div class="code-line">
+              <span class="ln">39</span><span class="src">          <span class="k">return</span> soaClient.getContractSummary(request);</span>
+            </div>
+            <div class="code-line"><span class="ln">40</span><span class="src">        });</span></div>
+            <div class="code-line removed">
+              <span class="ln">−</span><span class="src">    <span class="k">return</span> responseEntity.getResponse().getContractSummaryList();</span>
+            </div>
+            <div class="code-line added">
+              <span class="ln">41</span><span class="src">    <span class="t">GetContractSummaryResponseType</span> response = <span class="t">Optional</span></span>
+            </div>
+            <div class="code-line added">
+              <span class="ln">42</span><span class="src">        .ofNullable(responseEntity.getResponse())</span>
+            </div>
+            <div class="code-line added">
+              <span class="ln">43</span><span class="src">        .orElse(<span class="k">new</span> <span class="t">GetContractSummaryResponseType</span>());</span>
+            </div>
+            <div class="code-line added">
+              <span class="ln">44</span><span class="src">    <span class="k">return</span> response.getContractSummaryList();</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 变体：右侧至今未改动 -->
+      <div class="panes" id="panes-untouched" hidden>
+        <div class="pane then">
+          <div class="pane-head">
+            <span>b7f14c2 · 评论所在版本</span>
+            <span>行 37–41</span>
+          </div>
+          <div class="code">
+            <div class="code-line anchor">
+              <span class="ln">37</span><span class="src">    <span class="t">ResponseEntity</span>&lt;…&gt; responseEntity =</span>
+            </div>
+            <div class="code-line">
+              <span class="ln">38</span><span class="src">        <span class="hit">ReTryService.doIoService</span>(<span class="t">Exception</span>.class, …);</span>
+            </div>
+            <div class="code-line related">
+              <span class="ln">41</span><span class="src">    <span class="k">return</span> <span class="hit">responseEntity.getResponse()</span>.getContractSummaryList();</span>
+            </div>
+          </div>
+        </div>
+        <div class="pane-spine"></div>
+        <div class="pane now">
+          <div class="pane-head">
+            <span>master · 最新版本</span>
+            <span>行 37–41</span>
+          </div>
+          <div class="untouched">
+            <strong>这处至今未改动</strong>
+            <p>评论之后的 12 个 commit 都没有碰过 <code>getContractSummary</code> 的这几行，评论提的问题在当前 master 上仍然成立。</p>
+            <button>在 GitLab 打开最新版本</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 变体：取数失败 -->
+      <div class="panes" id="panes-failure" hidden style="grid-template-columns: 1fr">
+        <div class="pane">
+          <div class="failure">
+            <span class="failure-code">401 · 登录态已失效</span>
+            <strong>GitLab 不认这个会话了</strong>
+            <p>取代码需要你在 GitLab 的登录身份。在新标签页登录一次，然后回到这里重试；如果你的 GitLab 关闭了会话取数，改用访问令牌。</p>
+            <div class="failure-actions">
+              <button class="btn primary">重试</button>
+              <button class="btn">去 GitLab 登录</button>
+              <button class="btn">配置访问令牌</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 相关行浮层 -->
+      <div class="related-pop" id="related-pop" hidden>
+        <h4>评论可能指的是这几行</h4>
+        <div class="related-item">
+          <span class="rl">41</span>
+          <span class="rs">return responseEntity.getResponse().get…</span>
+          <span class="why">评论里的 responseEntity.getResponse() 在此处被调用</span>
+        </div>
+        <div class="related-item">
+          <span class="rl">38</span>
+          <span class="rs">ReTryService.doIoService(Exception.class…</span>
+          <span class="why">评论开头点名的方法，也是评论锚定的行</span>
+        </div>
+      </div>
+
+      <footer class="drawer-foot">
+        <div class="thread-nav">
+          <button aria-label="上一条评论">‹</button>
+          <span class="at">2 / 7</span>
+          <button aria-label="下一条评论">›</button>
+        </div>
+        <div class="view-switch" id="view-switch">
+          <button data-view="side" aria-pressed="true">并排</button>
+          <button data-view="stacked" aria-pressed="false">上下</button>
+        </div>
+        <button class="btn">展开完整方法体</button>
+        <button class="btn" id="btn-related">相关行 <span class="count">2</span></button>
+        <span class="spacer"></span>
+        <button class="btn primary">存为学习卡片</button>
+      </footer>
+    </aside>
+
+    <!-- 原型控制条 -->
+    <div class="proto-bar">
+      <span>STATE</span>
+      <button data-state="compare" aria-pressed="true">并排对比</button>
+      <button data-state="untouched" aria-pressed="false">至今未改动</button>
+      <button data-state="failure" aria-pressed="false">取数失败</button>
+      <button data-state="related" aria-pressed="false">相关行浮层</button>
+    </div>
+
+    <script>
+      const panes = {
+        compare: document.getElementById("panes-compare"),
+        untouched: document.getElementById("panes-untouched"),
+        failure: document.getElementById("panes-failure"),
+      };
+      const relatedPop = document.getElementById("related-pop");
+
+      document.querySelectorAll(".proto-bar button").forEach((button) => {
+        button.addEventListener("click", () => {
+          const { state } = button.dataset;
+          const base = state === "related" ? "compare" : state;
+          Object.entries(panes).forEach(([key, node]) => {
+            node.hidden = key !== base;
+          });
+          relatedPop.hidden = state !== "related";
+          document.querySelector(".drawer").classList.toggle("failed", base === "failure");
+          document.querySelectorAll(".proto-bar button").forEach((other) => {
+            other.setAttribute("aria-pressed", String(other === button));
+          });
+        });
+      });
+
+      const drawer = document.querySelector(".drawer");
+      document.querySelectorAll("#view-switch button").forEach((button) => {
+        button.addEventListener("click", () => {
+          drawer.classList.toggle("stacked", button.dataset.view === "stacked");
+          document.querySelectorAll("#view-switch button").forEach((other) => {
+            other.setAttribute("aria-pressed", String(other === button));
+          });
+        });
+      });
+
+      // 两栏滚动同步
+      const [thenCode, nowCode] = panes.compare.querySelectorAll(".code");
+      let syncing = false;
+      const sync = (from, to) => {
+        from.addEventListener("scroll", () => {
+          if (syncing) return;
+          syncing = true;
+          to.scrollTop = from.scrollTop;
+          requestAnimationFrame(() => (syncing = false));
+        });
+      };
+      sync(thenCode, nowCode);
+      sync(nowCode, thenCode);
+    </script>
+  </body>
+</html>
