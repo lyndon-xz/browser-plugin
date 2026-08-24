@@ -1,0 +1,16 @@
+{
+  "name": "review-lens",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome MV3 扩展：在 GitLab MR 讨论页并排看评论时与修正后的代码",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "dev": "node scripts/build.js --watch",
+    "test": "vitest --run"
+  },
+  "devDependencies": {
+    "jsdom": "30.0.1",
+    "vitest": "4.1.11"
+  }
+}

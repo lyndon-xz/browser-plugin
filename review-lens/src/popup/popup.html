@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>review-lens</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <span class="brand">review-lens</span>
+      <span class="tally" id="tally"></span>
+      <a class="mini-btn" id="open-settings" href="settings.html" target="_blank">设置</a>
+    </header>
+
+    <main id="cards"></main>
+
+    <footer>
+      <span class="hint">存储在本地，不上传</span>
+      <button class="btn primary" id="export">导出 Markdown</button>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
