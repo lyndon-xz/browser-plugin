@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>review-lens 设置</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body class="settings">
+    <main class="settings-sheet">
+      <h1>设置</h1>
+      <p class="settings-lede">
+        两项都不必填。默认用你在 GitLab 的登录态取数，只在内网 GitLab 与
+        gitlab.com 上运行。
+      </p>
+
+      <div class="field">
+        <label for="token">访问令牌</label>
+        <div class="field-row">
+          <select id="token-origin"></select>
+          <input
+            id="token"
+            type="password"
+            placeholder="glpat-…"
+            autocomplete="off"
+          />
+        </div>
+        <p class="field-note">
+          抽屉提示 401 时才需要——为某个站点填一个只读的 Personal Access
+          Token（scope
+          <code>read_api</code
+          >）。令牌按站点分开存，只发给它所属的那个站点；留空即该站点回到用登录态。只存本机，不同步、不进导出。
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="origin">额外的 GitLab 站点</label>
+        <div class="field-row">
+          <input
+            id="origin"
+            type="text"
+            placeholder="https://gitlab.example.com"
+          />
+          <button class="btn" id="add-origin" type="button">添加</button>
+        </div>
+        <p class="field-note">回车或点「添加」，浏览器会单独问你要授权。</p>
+        <ul class="origins" id="origins"></ul>
+      </div>
+
+      <div class="settings-actions">
+        <button class="btn primary" id="save">保存</button>
+        <span class="hint" id="status"></span>
+      </div>
+    </main>
+
+    <script type="module" src="settings.js"></script>
+  </body>
+</html>
