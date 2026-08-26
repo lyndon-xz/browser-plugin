@@ -263,7 +263,7 @@
 | 第 3 批 | M3-S3 | 否       | 依赖 M3-S2               |
 
 > **M3 验收结果**：deepseek.test.js 8 例（请求体/JSON解析/围栏/字母规整/文本兜底/异常）通过，全套 **60 单测绿**。真实浏览器验收：V-7 用真实无效 key（HTTP 401）验证——未命中→loading→错误态「⚠ AI 请求失败，请检查网络连接」；V-6 用本地 mock 桩返回 200 验证整条 content→background→parse→渲染路径——显示「A C / 多选 / 🤖 AI 推理 / 解析」，留证 `evidence/screenshots/M3-V6-ai-answer.png`。
-> **待用户处理**：需求 §8 写死的 DeepSeek key `sk-…2a87` 实测已失效（401），需替换为有效 key 才能得到真实 AI 答案；代码路径与错误兜底均已验证无误。
+> **DeepSeek key**：初始 key `sk-…2a87` 失效（401）；已替换为用户提供的有效 key `sk-…c17b`，真实 AI 答案端到端验证通过（留证 `evidence/screenshots/M3-V6-ai-answer-live.png`）。
 
 ---
 
