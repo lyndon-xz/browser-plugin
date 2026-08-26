@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exam Helper — 气泡原型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f5;
+    padding: 40px;
+    color: #333;
+  }
+
+  .mock-exam {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 8px;
+    padding: 32px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+
+  .mock-exam h2 { font-size: 18px; margin-bottom: 24px; color: #1a1a1a; }
+
+  .question {
+    margin-bottom: 28px;
+    line-height: 1.7;
+    font-size: 14px;
+  }
+
+  .question .q-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #222;
+  }
+
+  .question .q-option {
+    padding: 4px 0 4px 20px;
+    color: #444;
+  }
+
+  .hint {
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+    margin-bottom: 32px;
+    padding: 12px;
+    background: #fafafa;
+    border-radius: 6px;
+  }
+
+  /* ============================================
+     以下是气泡样式（实际扩展中在 Shadow DOM 内）
+     ============================================ */
+
+  .bubble-container {
+    position: relative;
+    display: inline;
+  }
+
+  /* --- 状态 1: 题库命中 --- */
+  .bubble {
+    position: absolute;
+    z-index: 999999;
+    width: 360px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.6;
+    box-shadow: 0 8px 32px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.06);
+    animation: bubbleFadeIn .15s ease-out;
+    pointer-events: none;
+  }
+
+  .bubble::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 24px;
+    width: 12px;
+    height: 12px;
+    background: #1a1a2e;
+    transform: rotate(45deg);
+    border-radius: 2px;
+  }
+
+  .bubble .answer-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .bubble .answer-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: #16a34a;
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 2px;
+    padding: 2px 10px;
+    border-radius: 5px;
+    flex-shrink: 0;
+  }
+
+  .bubble .answer-type {
+    font-size: 11px;
+    color: #9ca3af;
+  }
+
+  .bubble .answer-explain {
+    color: #c4c4c4;
+    font-size: 12px;
+    line-height: 1.6;
+    border-top: 1px solid rgba(255,255,255,.08);
+    padding-top: 8px;
+    margin-top: 4px;
+  }
+
+  .bubble .source-tag {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 10px;
+    color: #6b7280;
+    background: rgba(255,255,255,.06);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  /* --- 状态 2: AI 推理中 --- */
+  .bubble-loading {
+    position: absolute;
+    z-index: 999999;
+    background: #1a1a2e;
+    color: #9ca3af;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.06);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: bubbleFadeIn .15s ease-out;
+    pointer-events: none;
+  }
+
+  .bubble-loading::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 24px;
+    width: 12px;
+    height: 12px;
+    background: #1a1a2e;
+    transform: rotate(45deg);
+    border-radius: 2px;
+  }
+
+  .bubble-loading .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,.15);
+    border-top-color: #60a5fa;
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+  }
+
+  /* --- 状态 3: 错误 --- */
+  .bubble-error {
+    position: absolute;
+    z-index: 999999;
+    background: #1a1a2e;
+    color: #f87171;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.06);
+    animation: bubbleFadeIn .15s ease-out;
+    pointer-events: none;
+  }
+
+  .bubble-error::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 24px;
+    width: 12px;
+    height: 12px;
+    background: #1a1a2e;
+    transform: rotate(45deg);
+    border-radius: 2px;
+  }
+
+  @keyframes bubbleFadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* --- 演示布局 --- */
+  .demo-section {
+    margin-top: 40px;
+    padding-top: 32px;
+    border-top: 1px solid #eee;
+  }
+
+  .demo-section h3 {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+
+  .demo-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  .demo-item {
+    position: relative;
+  }
+
+  .demo-label {
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="hint">
+  💡 下方模拟考试页面。实际使用时选中题目文字，气泡自动浮现在选区下方。
+</div>
+
+<div class="mock-exam">
+  <h2>阿里巴巴 Java 编码规范认证考试</h2>
+
+  <div class="question">
+    <div class="q-title">多选 1. 关于多线程并行处理定时任务的情况，下列哪些说法符合《阿里巴巴Java开发手册》：</div>
+    <div class="q-option">A. 推荐使用Timer方式处理。</div>
+    <div class="q-option">B. 推荐使用ScheduledExecutorService方式处理。</div>
+    <div class="q-option">C. Timer运行多个TimeTask时，只要其中之一没有捕获抛出的异常，其它任务便会自动终止运行。</div>
+    <div class="q-option">D. ScheduledExecutorService并发运行多个定时任务时，其中某线程抛出异常，不会影响到其它线程的继续运行。</div>
+
+    <!-- 气泡演示：题库命中 -->
+    <div style="position:relative; height: 0;">
+      <div class="bubble" style="top: 8px; left: 0;">
+        <div class="answer-line">
+          <span class="answer-badge">B C D</span>
+          <span class="answer-type">多选</span>
+        </div>
+        <div class="answer-explain">
+          Timer 运行多个 TimeTask 时，一个异常会终止所有任务；ScheduledExecutorService 线程间互不影响。不推荐 Timer。
+        </div>
+        <span class="source-tag">📚 题库命中</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="height: 140px;"></div>
+
+  <div class="question">
+    <div class="q-title">单选 2. KV结构的集合，在处理null值的存储上有细微的区别，下列哪些说法是正确的：</div>
+    <div class="q-option">A. TreeMap的key不可以为null</div>
+    <div class="q-option">B. TreeMap的key可以为null</div>
+    <div class="q-option">C. ConcurrentHashMap的key可以为null</div>
+    <div class="q-option">D. ConcurrentHashMap的value可以为null</div>
+
+    <!-- 气泡演示：AI 推理中 -->
+    <div style="position:relative; height: 0;">
+      <div class="bubble-loading" style="top: 8px; left: 0;">
+        <div class="spinner"></div>
+        <span>AI 推理中…</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="height: 60px;"></div>
+
+  <div class="question">
+    <div class="q-title">多选 3. 关于某个虚构的题目…</div>
+    <div class="q-option">A. 选项一</div>
+    <div class="q-option">B. 选项二</div>
+
+    <!-- 气泡演示：错误 -->
+    <div style="position:relative; height: 0;">
+      <div class="bubble-error" style="top: 8px; left: 0;">
+        ⚠ API 请求失败，请检查网络连接
+      </div>
+    </div>
+  </div>
+
+  <div style="height: 60px;"></div>
+</div>
+
+<!-- 三种状态独立展示 -->
+<div class="demo-section">
+  <h3>气泡三种状态对照</h3>
+  <div class="demo-row">
+
+    <div class="demo-item">
+      <div class="demo-label">✅ 题库命中</div>
+      <div class="bubble" style="position:relative; top:0; left:0;">
+        <div class="answer-line">
+          <span class="answer-badge">A C D</span>
+          <span class="answer-type">多选</span>
+        </div>
+        <div class="answer-explain">
+          SimpleDateFormat 是线程不安全的类。如果定义为 static，必须保证线程安全。推荐用 Apache 的 DateUtils。
+        </div>
+        <span class="source-tag">📚 题库命中</span>
+      </div>
+    </div>
+
+    <div class="demo-item">
+      <div class="demo-label">⏳ AI 推理中</div>
+      <div class="bubble-loading" style="position:relative; top:0; left:0;">
+        <div class="spinner"></div>
+        <span>AI 推理中…</span>
+      </div>
+    </div>
+
+    <div class="demo-item">
+      <div class="demo-label">❌ 错误</div>
+      <div class="bubble-error" style="position:relative; top:0; left:0;">
+        ⚠ API 请求失败，请检查网络连接
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
