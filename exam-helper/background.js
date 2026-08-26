@@ -1,11 +1,16 @@
 /**
- * 后台 service worker background.js（M1-S6，对应验收 V-4）
+ * 后台 service worker background.js
  *
- * 职责：监听 Alt+Q 全局快捷键（commands: toggle-enable），翻转启用状态，
- *   更新扩展图标（active/inactive），并通知当前标签的 content script。
- *   （M3 阶段在此扩展 DeepSeek API 代理。）
+ * 职责：
+ *   1) Alt+Q 全局快捷键（commands: toggle-enable）翻转启用状态、切图标、通知 content（M1-S6，V-4）
+ *   2) 代理 content 的 DeepSeek 请求（M3-S2，V-6/V-7）：规避宿主页 CSP、隔离 API key（TD-4）
  */
 importScripts("utils/storage.js");
+importScripts("utils/deepseek.js");
+
+// DeepSeek API key：个人使用直接写死（需求 §5.1 Q-6，接受泄露风险，不公开分发）
+const DEEPSEEK_API_KEY = "";
+const REQUEST_TIMEOUT_MS = 5000; // 需求 §6
 
 const ICON_SIZES = [16, 32, 48, 128];
 
@@ -56,4 +61,43 @@ chrome.commands.onCommand.addListener(async (command) => {
   } catch (e) {
     // 无可通知的标签（如 chrome:// 页面）时忽略
   }
+});
+
+// 调用 DeepSeek：题库未命中时的 AI 兜底
+async function askDeepSeek(text) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const resp = await fetch(DeepSeek.API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify(DeepSeek.buildRequestBody(text)),
+      signal: controller.signal,
+    });
+    if (!resp.ok) {
+      throw new Error(`DeepSeek 请求失败（HTTP ${resp.status}）`);
+    }
+    const json = await resp.json();
+    return DeepSeek.parseResponse(json); // { answer, explain }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// content 未命中时发来 {action:"askAI", text}，回传 {answer,explain} 或 {error}
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.action !== "askAI") return;
+  askDeepSeek(message.text)
+    .then((result) => sendResponse({ ok: true, ...result }))
+    .catch((err) => {
+      const aborted = err && err.name === "AbortError";
+      sendResponse({
+        ok: false,
+        error: aborted ? "AI 请求超时，请重试" : "AI 请求失败，请检查网络连接",
+      });
+    });
+  return true; // 异步 sendResponse
 });
