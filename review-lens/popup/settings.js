@@ -46,9 +46,7 @@ function drawTokenOrigins() {
   }
 
   tokenOrigin.value =
-    kept && [...tokenOrigin.options].some((o) => o.value === kept)
-      ? kept
-      : BUILT_IN_ORIGINS[0];
+    kept && [...tokenOrigin.options].some((o) => o.value === kept) ? kept : BUILT_IN_ORIGINS[0];
   tokenInput.value = settings.tokens?.[tokenOrigin.value] ?? "";
 }
 
@@ -77,9 +75,7 @@ function drawOrigins() {
 
         settings = await ask(MESSAGE_ACTION.writeSettings, {
           patch: {
-            extraOrigins: settings.extraOrigins.filter(
-              (kept) => kept !== origin,
-            ),
+            extraOrigins: settings.extraOrigins.filter((kept) => kept !== origin),
           },
         });
         drawOrigins();
@@ -99,8 +95,11 @@ document.getElementById("save").addEventListener("click", async () => {
   try {
     const tokens = { ...settings.tokens };
     // 留空的意思是「这个站点回到用登录态」，那就把这一项去掉而不是留一个空串
-    if (tokenInput.value) tokens[tokenOrigin.value] = tokenInput.value;
-    else delete tokens[tokenOrigin.value];
+    if (tokenInput.value) {
+      tokens[tokenOrigin.value] = tokenInput.value;
+    } else {
+      delete tokens[tokenOrigin.value];
+    }
 
     settings = await ask(MESSAGE_ACTION.writeSettings, { patch: { tokens } });
     say(`已保存 ${displayName(tokenOrigin.value)} 的设置`);
@@ -118,7 +117,9 @@ async function addOrigin() {
    * 两条触发路径（点击、回车）：只在按钮上设 disabled 挡不住回车，
    * 连按两次会并发跑两遍授权与写入；settings 未就绪时读它的字段会抛。
    */
-  if (addButton.disabled || !settings) return;
+  if (addButton.disabled || !settings) {
+    return;
+  }
 
   const origin = originInput.value.trim().replace(/\/$/, "");
   if (!ORIGIN_PATTERN.test(origin)) {
@@ -172,7 +173,9 @@ tokenOrigin.addEventListener("change", () => {
 addButton.addEventListener("click", addOrigin);
 originInput.addEventListener("keydown", (event) => {
   // addOrigin 自己 try/catch/finally 全包，失败已在界面上说明，这里刻意不等
-  if (event.key === "Enter") void addOrigin();
+  if (event.key === "Enter") {
+    void addOrigin();
+  }
 });
 
 // 读设置失败也得说话，否则整个模块中止、页面只剩一个空壳

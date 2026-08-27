@@ -15,9 +15,13 @@ function methodStartsNamed(lines, name) {
   const starts = [];
   lines.forEach((line, index) => {
     // 必须是方法起始行，否则同名的调用点也会被算进来
-    if (nameOf(line) !== name) return;
+    if (nameOf(line) !== name) {
+      return;
+    }
     const range = findMethodRange(lines, index + 1);
-    if (range?.start === index + 1) starts.push(range.start);
+    if (range?.start === index + 1) {
+      starts.push(range.start);
+    }
   });
   return starts;
 }
@@ -26,13 +30,19 @@ export function locateInNewVersion(request) {
   const { oldLines, newLines, anchorLine } = request;
 
   const oldRange = findMethodRange(oldLines, anchorLine);
-  if (!oldRange) return null;
+  if (!oldRange) {
+    return null;
+  }
 
   const name = nameOf(oldLines[oldRange.start - 1]);
-  if (!name) return null;
+  if (!name) {
+    return null;
+  }
 
   const candidates = methodStartsNamed(newLines, name);
-  if (!candidates.length) return null;
+  if (!candidates.length) {
+    return null;
+  }
 
   // 同名方法可能出现多次（重载、复制粘贴），取行号最接近旧位置的那处
   const newStart = candidates.reduce((best, line) =>

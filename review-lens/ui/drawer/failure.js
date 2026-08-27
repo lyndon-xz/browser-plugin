@@ -12,8 +12,7 @@ const EXPLANATION = {
   [ERROR_KIND.forbidden]: {
     reason: "无权访问",
     title: "这个仓库你没有读权限",
-    detail:
-      "GitLab 拒绝了这次读取。找项目负责人开权限，或换一个你有权限的 MR。",
+    detail: "GitLab 拒绝了这次读取。找项目负责人开权限，或换一个你有权限的 MR。",
     canUseToken: false,
   },
   [ERROR_KIND.notFound]: {
@@ -26,8 +25,7 @@ const EXPLANATION = {
   [ERROR_KIND.server]: {
     reason: "服务端出错",
     title: "GitLab 这次没返回结果",
-    detail:
-      "服务端报错，通常过一会儿就好。重试一次；持续失败就是实例本身的问题。",
+    detail: "服务端报错，通常过一会儿就好。重试一次；持续失败就是实例本身的问题。",
     canUseToken: false,
   },
   [ERROR_KIND.unexpected]: {
@@ -46,7 +44,9 @@ const EXPLANATION = {
 
 // 没有接上处理器就不渲染按钮，避免留下一个点了没反应的出口
 function actionButton(label, handler) {
-  if (!handler) return null;
+  if (!handler) {
+    return null;
+  }
 
   const button = document.createElement("button");
   button.className = "btn";
@@ -90,9 +90,7 @@ export function renderFailure(request) {
   actions.append(
     ...[
       actionButton("重试", onRetry),
-      explanation.canUseToken
-        ? actionButton("配置访问令牌", onConfigureToken)
-        : null,
+      explanation.canUseToken ? actionButton("配置访问令牌", onConfigureToken) : null,
     ].filter(Boolean),
   );
 

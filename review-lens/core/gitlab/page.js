@@ -21,7 +21,9 @@ export function isMergeRequestPage(document, location) {
  */
 export function parseMergeRequestRef(location) {
   const matched = location.pathname.match(/^\/(.+?)\/-\/merge_requests\/(\d+)/);
-  if (!matched) return null;
+  if (!matched) {
+    return null;
+  }
 
   const [, projectPath, mrIid] = matched;
   // project 是编码后的，可直接当 API 的 :id；projectPath 保留原样，拼附件 URL 用

@@ -46,8 +46,7 @@ function diffOfBase(thenBase, nowBase) {
 
   return ops.map((op) => ({
     ...op,
-    thenLine:
-      op.thenLine === null ? null : op.thenLine + thenBase.rangeStart - 1,
+    thenLine: op.thenLine === null ? null : op.thenLine + thenBase.rangeStart - 1,
     nowLine: op.nowLine === null ? null : op.nowLine + nowBase.rangeStart - 1,
   }));
 }
@@ -58,9 +57,7 @@ export async function buildComparePair(client, request) {
   // 锚点在旧侧时行号属于 base_sha 那个版本，拿 head_sha 去切同一行号会切到别处
   const anchorSha =
     thread.anchorSide === ANCHOR_SIDE.old
-      ? (thread.position.base_sha ??
-        thread.position.start_sha ??
-        thread.position.head_sha)
+      ? (thread.position.base_sha ?? thread.position.start_sha ?? thread.position.head_sha)
       : thread.position.head_sha;
 
   const oldLines = await loadFile(client, {

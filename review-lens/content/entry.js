@@ -39,7 +39,9 @@ export async function init(overrides = {}) {
   } = overrides;
 
   const ref = parseMergeRequestRef(location);
-  if (!ref) return () => {};
+  if (!ref) {
+    return () => {};
+  }
 
   const client = createGitLabClient({ origin, fetch: fetchImpl, readToken });
   const threads = createThreads({ client, ref });
@@ -103,7 +105,9 @@ export async function init(overrides = {}) {
     }
 
     const thread = threads.threadFor(discussionId);
-    if (!thread) return;
+    if (!thread) {
+      return;
+    }
 
     drawer.render({ status: DRAWER_STATUS.loading, thread });
     try {
@@ -115,10 +119,14 @@ export async function init(overrides = {}) {
         extraLines,
       });
       // 连点两条评论时先发的可能后返回；过期的响应直接丢弃，否则会盖掉当前这条
-      if (openedDiscussionId !== discussionId) return;
+      if (openedDiscussionId !== discussionId) {
+        return;
+      }
 
       const savedCardId = await savedCardIdFor(discussionId);
-      if (openedDiscussionId !== discussionId) return;
+      if (openedDiscussionId !== discussionId) {
+        return;
+      }
 
       drawer.render({
         status: DRAWER_STATUS.ready,
@@ -128,7 +136,9 @@ export async function init(overrides = {}) {
         savedCardId,
       });
     } catch (error) {
-      if (openedDiscussionId !== discussionId) return;
+      if (openedDiscussionId !== discussionId) {
+        return;
+      }
 
       drawer.render({
         status: DRAWER_STATUS.failed,

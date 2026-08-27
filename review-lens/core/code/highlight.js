@@ -97,6 +97,8 @@ export function tokenizeJava(line) {
 
 // 大写开头视作类型名：Java 的命名约定足够可靠，不必解析导入
 const wordKind = (word) => {
-  if (KEYWORDS.has(word)) return "keyword";
+  if (KEYWORDS.has(word)) {
+    return "keyword";
+  }
   return /^[A-Z]/.test(word) ? "type" : "plain";
 };

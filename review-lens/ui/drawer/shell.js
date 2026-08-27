@@ -20,16 +20,20 @@ export function createShell(request) {
   // 拖拽进行中被关掉（Esc、点外部）时也要解绑，否则监听会继续给已分离的节点写样式并写存储
   let releaseDrag = null;
 
-  function onKeydown(event) {
-    if (event.key === "Escape") onDismiss();
+  function closeOnEscape(event) {
+    if (event.key === "Escape") {
+      onDismiss();
+    }
   }
 
   /*
    * 点抽屉以外的位置关闭。用 mousedown 而不是 click：宿主页上不少控件会在 mousedown
    * 阶段就改动 DOM，等到 click 时事件目标可能已不在文档里，判不出内外。
    */
-  function onPointerDown(event) {
-    if (host && !event.composedPath().includes(host)) onDismiss();
+  function closeOnOutsideClick(event) {
+    if (host && !event.composedPath().includes(host)) {
+      onDismiss();
+    }
   }
 
   function mount() {
@@ -41,8 +45,8 @@ export function createShell(request) {
     root.append(style);
 
     document.body.append(host);
-    document.addEventListener("keydown", onKeydown);
-    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("mousedown", closeOnOutsideClick);
 
     /*
      * 锁住宿主页滚动，原值记在 body 的 data 上而不是闭包里：同时存在两个实例时，
@@ -50,8 +54,9 @@ export function createShell(request) {
      */
     const already = document.body.dataset.reviewLensOverflow;
     hostOverflow = already ?? document.body.style.overflow;
-    if (already === undefined)
+    if (already === undefined) {
       document.body.dataset.reviewLensOverflow = hostOverflow;
+    }
     document.body.style.overflow = "hidden";
   }
 
@@ -70,7 +75,7 @@ export function createShell(request) {
       const startX = event.clientX;
       let current = width;
 
-      const onMove = (move) => {
+      const trackPointer = (move) => {
         // 往左拖变宽：抽屉贴在右边缘
         const next = width + (startX - move.clientX);
         current = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, next));
@@ -78,18 +83,18 @@ export function createShell(request) {
         onResize(current);
       };
       const stop = () => {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
+        document.removeEventListener("mousemove", trackPointer);
+        document.removeEventListener("mouseup", commitWidth);
         releaseDrag = null;
       };
-      const onUp = () => {
+      const commitWidth = () => {
         stop();
         onCommit(current);
       };
 
       releaseDrag = stop;
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
+      document.addEventListener("mousemove", trackPointer);
+      document.addEventListener("mouseup", commitWidth);
       event.preventDefault();
     });
 
@@ -99,13 +104,15 @@ export function createShell(request) {
   // 只重建内容，样式节点留着，避免每次渲染重新解析 CSS
   function clearContent() {
     for (const node of [...root.children]) {
-      if (node.tagName !== "STYLE") node.remove();
+      if (node.tagName !== "STYLE") {
+        node.remove();
+      }
     }
   }
 
   function close() {
-    document.removeEventListener("keydown", onKeydown);
-    document.removeEventListener("mousedown", onPointerDown);
+    document.removeEventListener("keydown", closeOnEscape);
+    document.removeEventListener("mousedown", closeOnOutsideClick);
     releaseDrag?.();
     if (hostOverflow !== null) {
       document.body.style.overflow = hostOverflow;

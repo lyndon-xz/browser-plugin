@@ -18,9 +18,7 @@ function miniPair(card) {
   now.append(
     tag("修正后"),
     // null 表示至今未改动，与 ComparePair、卡片存储同一口径
-    document.createTextNode(
-      card.nowCode === null ? "至今未改动" : card.nowCode,
-    ),
+    document.createTextNode(card.nowCode === null ? "至今未改动" : card.nowCode),
   );
 
   mini.append(then, now);
@@ -129,9 +127,7 @@ export function renderCardList(root, request) {
       ...projects.map((project) => [project, project]),
     ]) {
       const count =
-        value === ALL
-          ? cards.length
-          : cards.filter((card) => card.source.project === value).length;
+        value === ALL ? cards.length : cards.filter((card) => card.source.project === value).length;
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "chip";
@@ -145,10 +141,7 @@ export function renderCardList(root, request) {
     }
     root.append(filters);
 
-    const shown =
-      filter === ALL
-        ? cards
-        : cards.filter((card) => card.source.project === filter);
+    const shown = filter === ALL ? cards : cards.filter((card) => card.source.project === filter);
     if (!shown.length) {
       root.append(emptyState("这个仓库还没有卡片"));
       return;
@@ -156,7 +149,9 @@ export function renderCardList(root, request) {
 
     const list = document.createElement("div");
     list.className = "list";
-    for (const card of shown) list.append(cardRow(card, { onDelete }));
+    for (const card of shown) {
+      list.append(cardRow(card, { onDelete }));
+    }
     root.append(list);
   }
 

@@ -16,6 +16,8 @@
   --mark-bg: #eef0ff;
   --dim: #8a93a8;
   /* 注入宿主页的浮层要盖住 GitLab 的一切，取 int32 上限附近；具名后不必在规则里裸写 */
+  /* 评论区最多占抽屉的多少：代码对比是主体，评论是它的由来 */
+  --read-max-height: 38%;
   --layer-top: 2147483000;
   /* 标识符 chip 的描边与选中底色，多处共用 */
   --chip-line: #b9bcf7;
@@ -181,13 +183,30 @@
   line-height: 1.8;
 }
 
-/* 贴在评论里的截图：宽度不超出正文，细边框把它与正文分开 */
+/*
+ * 贴在评论里的截图：按原比例完整显示，不裁切——评论区自己是滚动区，长图不会顶到代码区，
+ * 再限高只是让读者非得点开新标签才看得全。max-width 而非 width：小图不放大成一片模糊。
+ * 仍可点开看原图（外层是 a[target=_blank]），聊天记录这类长截图放大了才读得清。
+ */
 .shot {
   display: block;
   max-width: 100%;
   margin: 8px 0 2px;
+  cursor: zoom-in;
   border: 1px solid var(--line);
   border-radius: 6px;
+}
+
+/*
+ * 评论与回复：高度由别人写的内容决定，给上限并自己滚，代码区才不会被顶走。
+ * 不参与收缩（flex-shrink: 0）——允许收缩时它会为下面占满剩余空间的代码区一路退让，
+ * 实测 308px 的内容被压到 156px、凭空多出一个滚动条，而上限 38% 根本没到。
+ */
+.read {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: var(--read-max-height);
+  overflow-y: auto;
 }
 
 /* 签名元素：时间脊的标签行，把两个时点绑在一起 */
@@ -226,10 +245,9 @@
 
 .panes {
   display: grid;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   grid-template-columns: 1fr 6px 1fr;
   min-height: 0;
-  max-height: calc(100vh - 330px);
   margin: 10px 16px;
   overflow: hidden;
   background: var(--card);

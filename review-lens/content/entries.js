@@ -53,18 +53,27 @@ export function attachEntries(request) {
 
   function attachTo(box) {
     const { discussionId } = box.dataset;
-    if (codeDiscussionIds && !codeDiscussionIds.has(discussionId)) return;
-    if (box.querySelector(`.${ENTRY_CLASS}`)) return;
+    if (codeDiscussionIds && !codeDiscussionIds.has(discussionId)) {
+      return;
+    }
+    if (box.querySelector(`.${ENTRY_CLASS}`)) {
+      return;
+    }
 
     const actions = box.querySelector(ACTIONS_SELECTOR);
     const entry = createEntry(discussionId, onOpen);
     // 放在「显示主题」左边，读者的视线正好落在这里
-    if (actions) actions.prepend(entry);
-    else box.prepend(entry);
+    if (actions) {
+      actions.prepend(entry);
+    } else {
+      box.prepend(entry);
+    }
   }
 
   function scan() {
-    for (const box of root.querySelectorAll(DISCUSSION_SELECTOR)) attachTo(box);
+    for (const box of root.querySelectorAll(DISCUSSION_SELECTOR)) {
+      attachTo(box);
+    }
   }
 
   scan();
@@ -79,7 +88,8 @@ export function attachEntries(request) {
      * 已挂的按钮也要摘掉：宿主页是客户端路由，节点可能留在文档里，而它们的 click
      * 指向这一轮的闭包（旧 client、旧讨论数据），下一轮挂载又会在同一处再加一个。
      */
-    for (const entry of root.querySelectorAll(`.${ENTRY_CLASS}`))
+    for (const entry of root.querySelectorAll(`.${ENTRY_CLASS}`)) {
       entry.remove();
+    }
   };
 }

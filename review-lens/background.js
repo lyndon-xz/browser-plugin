@@ -18,15 +18,19 @@ const ACTIVE_ICONS = {
   128: "icons/active/icon-128.png",
 };
 
-// 只点亮上报过的那个标签页；Chrome 在标签页导航时会自动清掉标签页级的图标设置
+// 只改上报过的那个标签页；Chrome 在标签页导航时会自动清掉标签页级的图标设置
 const setIconFor = (tabId, path) =>
   tabId === undefined
     ? Promise.resolve()
     : chrome.action.setIcon({ tabId, path });
 
 const lightUp = (tabId) => setIconFor(tabId, ACTIVE_ICONS);
-// 复位靠显式清除：传 null 让这个标签页回到清单里声明的默认（灰色）图标
-const dimDown = (tabId) => setIconFor(tabId, null);
+/*
+ * 复位要显式指回灰色图标：setIcon 必须给出 path 或 imageData，传 null 会被拒。
+ * 取清单里声明的 default_icon，灰色图标的路径只在清单里写一份。
+ */
+const dimDown = (tabId) =>
+  setIconFor(tabId, chrome.runtime.getManifest().action.default_icon);
 
 const HANDLERS = {
   [MESSAGE_ACTION.listCards]: () => store.listCards(),

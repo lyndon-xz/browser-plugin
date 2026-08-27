@@ -14,7 +14,9 @@ export function relatedLines(request) {
   const hitsByLine = new Map();
   for (const { text, lines: hitLines } of located) {
     for (const number of hitLines) {
-      if (!hitsByLine.has(number)) hitsByLine.set(number, []);
+      if (!hitsByLine.has(number)) {
+        hitsByLine.set(number, []);
+      }
       hitsByLine.get(number).push(text);
     }
   }

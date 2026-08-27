@@ -23,12 +23,16 @@ const SIDE = {
  * 因此「上下各多看几行」扩出来的上下文行不在集合里。
  */
 function changedRows(diffOps, side) {
-  if (!diffOps?.length) return new Set();
+  if (!diffOps?.length) {
+    return new Set();
+  }
 
   const { lineKey, opType } = SIDE[side];
   const changed = new Set();
   for (const op of diffOps) {
-    if (op.type !== opType) continue;
+    if (op.type !== opType) {
+      continue;
+    }
     changed.add(op[lineKey]);
   }
   return changed;
@@ -79,8 +83,12 @@ function renderLine(line, context) {
   const row = document.createElement("div");
   row.className = "code-line";
   row.dataset.line = String(number);
-  if (number === anchorLine) row.classList.add("anchor");
-  if (changedLines.has(number)) row.classList.add(changeType);
+  if (number === anchorLine) {
+    row.classList.add("anchor");
+  }
+  if (changedLines.has(number)) {
+    row.classList.add(changeType);
+  }
 
   const gutter = document.createElement("span");
   gutter.className = "ln";

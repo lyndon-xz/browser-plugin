@@ -31,8 +31,7 @@ export class GitLabRequestError extends Error {
 
 // 400、429 既不是登录失效也不是权限不足，兜底成 unauthenticated 会把人引向配令牌这条死路
 const kindOf = (status) =>
-  KIND_BY_STATUS[status] ??
-  (status >= 500 ? ERROR_KIND.server : ERROR_KIND.unexpected);
+  KIND_BY_STATUS[status] ?? (status >= 500 ? ERROR_KIND.server : ERROR_KIND.unexpected);
 
 export function createGitLabClient(config) {
   const { origin, fetch, readToken } = config;
@@ -59,11 +58,7 @@ export function createGitLabClient(config) {
      * undefined，界面只能说「未知错误」，说不出重配令牌或重新登录这两条出路。
      */
     if (withToken && !token) {
-      throw new GitLabRequestError(
-        ERROR_KIND.unauthenticated,
-        0,
-        "读不到访问令牌",
-      );
+      throw new GitLabRequestError(ERROR_KIND.unauthenticated, 0, "读不到访问令牌");
     }
 
     let response;
@@ -82,14 +77,12 @@ export function createGitLabClient(config) {
     let response = await request(path, { withToken: hasAcceptedToken });
 
     // 登录态被拒时才动用令牌；403 同样可能是会话身份不足，一并尝试
-    if (
-      !response.ok &&
-      (response.status === 401 || response.status === 403) &&
-      !hasAcceptedToken
-    ) {
+    if (!response.ok && (response.status === 401 || response.status === 403) && !hasAcceptedToken) {
       // 令牌读不到时 request 会抛 unauthenticated，那正是该报给用户的原因
       const retried = await request(path, { withToken: true });
-      if (retried.ok) hasAcceptedToken = true;
+      if (retried.ok) {
+        hasAcceptedToken = true;
+      }
       response = retried;
     }
 
@@ -105,7 +98,9 @@ export function createGitLabClient(config) {
 
   // 失败不进缓存，否则「重试」按钮点了也只是拿回同一个错误
   function cached(path, read) {
-    if (cache.has(path)) return cache.get(path);
+    if (cache.has(path)) {
+      return cache.get(path);
+    }
 
     const pending = (async () => {
       try {

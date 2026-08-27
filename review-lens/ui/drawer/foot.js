@@ -65,9 +65,7 @@ function cardFrom(state, site, note) {
     replies: thread.replies ?? [],
     thenCode: state.then.lines.map((line) => line.text).join("\n"),
     // null 表示没有第二份代码可存：至今未改动，或当前分支上已定位不到
-    nowCode: state.now
-      ? state.now.lines.map((line) => line.text).join("\n")
-      : null,
+    nowCode: state.now ? state.now.lines.map((line) => line.text).join("\n") : null,
     note,
   };
 }
@@ -107,7 +105,9 @@ function renderSaveButton(request) {
 
   save.addEventListener("click", async () => {
     // 连点两次只该存一条：先锁入口，再发请求
-    if (save.disabled) return;
+    if (save.disabled) {
+      return;
+    }
     save.disabled = true;
 
     try {
@@ -167,8 +167,11 @@ export function renderFoot(request) {
     related.addEventListener("click", () => {
       // 再点一次收起：浮层就挂在 anchor 里，不必去整个抽屉里找
       const existing = anchor.querySelector(".related-pop");
-      if (existing) existing.remove();
-      else renderRelatedPopover({ anchor, candidates, onFlashLine });
+      if (existing) {
+        existing.remove();
+      } else {
+        renderRelatedPopover({ anchor, candidates, onFlashLine });
+      }
     });
 
     anchor.append(related);

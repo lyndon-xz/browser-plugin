@@ -27,7 +27,9 @@ function renderViewSwitch(request) {
     button.textContent = label;
     button.setAttribute("aria-pressed", String(view === name));
     button.addEventListener("click", () => {
-      if (view === name) return;
+      if (view === name) {
+        return;
+      }
       onViewChange(name);
     });
     group.append(button);
@@ -66,8 +68,9 @@ export function renderSpine(request) {
   // 视图切换排的是两个块，右边是代码还是结论都一样
   spine.append(selectionNote, renderViewSwitch({ view, onViewChange }));
   // 同步滚动要两个都能滚的代码区才有施力点
-  if (hasTwoSides(state))
+  if (hasTwoSides(state)) {
     spine.append(renderSyncToggle({ isSyncing, onSyncChange }));
+  }
 
   return spine;
 }
@@ -121,10 +124,10 @@ export const readScroll = (root) =>
 export function restoreScroll(root, wasAt) {
   codePanesIn(root).forEach((el, index) => {
     const was = wasAt[index];
-    if (!was?.top) return;
-    el.scrollTop = was.height
-      ? (was.top / was.height) * el.scrollHeight
-      : was.top;
+    if (!was?.top) {
+      return;
+    }
+    el.scrollTop = was.height ? (was.top / was.height) * el.scrollHeight : was.top;
   });
 }
 
@@ -134,7 +137,9 @@ export function restoreScroll(root, wasAt) {
  */
 export function flashLine(root, line) {
   const row = root.querySelector(`.code-line[data-line="${line}"]`);
-  if (!row) return;
+  if (!row) {
+    return;
+  }
 
   row.scrollIntoView({ block: "center" });
   row.classList.add("flash");
@@ -149,12 +154,16 @@ export function flashLine(root, line) {
  */
 export function linkScroll(panes, isSyncing) {
   const [a, b] = panes.querySelectorAll(".code");
-  if (!a || !b) return;
+  if (!a || !b) {
+    return;
+  }
 
   let echo = false;
   const link = (from, to) =>
     from.addEventListener("scroll", () => {
-      if (!isSyncing() || echo) return;
+      if (!isSyncing() || echo) {
+        return;
+      }
       echo = true;
       to.scrollTop = from.scrollTop;
       requestAnimationFrame(() => {

@@ -8,6 +8,10 @@ export function runDetached(label, task) {
     try {
       await task();
     } catch (error) {
+      // 扩展被重载后这份脚本成了孤儿（chrome.runtime.id 消失），任何后台调用都只会失败
+      if (!chrome.runtime?.id) {
+        return;
+      }
       console.error(`[review-lens] ${label}：`, error);
     }
   })();

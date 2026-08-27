@@ -1,7 +1,9 @@
 function splitLines(text) {
   const lines = text.split(/\r?\n/);
   // 文件通常以换行结尾，split 会多出一个空串，它不是真实的一行
-  if (lines.at(-1) === "") lines.pop();
+  if (lines.at(-1) === "") {
+    lines.pop();
+  }
   return lines;
 }
 

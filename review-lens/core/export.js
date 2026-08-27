@@ -53,7 +53,9 @@ function section(card) {
     "",
   );
 
-  if (card.note) lines.push("### 我的笔记", "", card.note, "");
+  if (card.note) {
+    lines.push("### 我的笔记", "", card.note, "");
+  }
 
   return lines.join("\n");
 }
@@ -66,12 +68,13 @@ export function toMarkdown(cards) {
     "",
   ];
 
-  if (!cards.length)
+  if (!cards.length) {
     return [
       ...head,
       "还没有卡片。在 GitLab 的代码评论旁点「解读」，看懂一条就存下来。",
       "",
     ].join("\n");
+  }
 
   const newestFirst = [...cards].sort((a, b) =>
     String(b.savedAt).localeCompare(String(a.savedAt)),

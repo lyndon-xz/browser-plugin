@@ -1,7 +1,4 @@
-import {
-  extractIdentifiers,
-  locateIdentifiers,
-} from "../core/comment/identifier.js";
+import { extractIdentifiers, locateIdentifiers } from "../core/comment/identifier.js";
 
 import { renderCommentCard, renderReplies } from "./drawer/comment-card.js";
 import { renderFailure } from "./drawer/failure.js";
@@ -17,12 +14,7 @@ import {
   restoreScroll,
 } from "./drawer/panes.js";
 import { createShell } from "./drawer/shell.js";
-import {
-  badgeFor,
-  describeSelection,
-  renderHead,
-  renderNoCode,
-} from "./drawer/verdict.js";
+import { badgeFor, describeSelection, renderHead, renderNoCode } from "./drawer/verdict.js";
 
 const DEFAULT_WIDTH = 820;
 
@@ -75,7 +67,9 @@ export function createDrawer(options) {
   function jumpTo(identifier) {
     const located = locateIdentifiers([identifier], lastState.then.lines)[0];
     const line = located?.lines[0];
-    if (line) flashLine(shell.root, line);
+    if (line) {
+      flashLine(shell.root, line);
+    }
   }
 
   // 换布局要整块重绘，所以先记下滚动位置、重绘完再按比例还原
@@ -88,7 +82,9 @@ export function createDrawer(options) {
   }
 
   function hitsIn(state) {
-    if (!state.then) return [];
+    if (!state.then) {
+      return [];
+    }
 
     return locateIdentifiers(
       extractIdentifiers(state.thread?.body).map((item) => item.text),
@@ -122,7 +118,9 @@ export function createDrawer(options) {
     });
     drawer.append(panes);
     // 同步是让两侧停在对应的那段代码上，两种布局都成立
-    if (hasTwoSides(state)) linkScroll(panes, () => syncing);
+    if (hasTwoSides(state)) {
+      linkScroll(panes, () => syncing);
+    }
 
     drawer.append(
       renderFoot({
@@ -152,7 +150,9 @@ export function createDrawer(options) {
     lastState = state;
     hitIdentifiers = hitsIn(state);
 
-    if (!shell.isMounted()) shell.mount();
+    if (!shell.isMounted()) {
+      shell.mount();
+    }
     shell.clearContent();
 
     const drawer = document.createElement("aside");
@@ -168,7 +168,13 @@ export function createDrawer(options) {
 
     drawer.append(renderHead({ thread: state.thread, onClose: close }));
     if (state.thread) {
-      drawer.append(
+      /*
+       * 评论与回复合成一个可滚动区：它们的高度由别人写的内容决定（长正文、几十条回复、
+       * 贴一张长截图），不给上限就会把下面的代码对比区整个顶出视口。
+       */
+      const read = document.createElement("div");
+      read.className = "read";
+      read.append(
         renderCommentCard({
           thread: state.thread,
           badge: badgeFor(state),
@@ -183,7 +189,10 @@ export function createDrawer(options) {
         hitIdentifiers,
         onJumpTo: jumpTo,
       });
-      if (replies) drawer.append(replies);
+      if (replies) {
+        read.append(replies);
+      }
+      drawer.append(read);
     }
 
     /*

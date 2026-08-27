@@ -16,7 +16,9 @@
 
   const report = (error) => {
     // 其余错误要留出口：静默 catch 会让失败表现为「页面毫无反应」，无从排查
-    if (!isOrphaned(error)) console.error("[review-lens] 启动失败：", error);
+    if (!isOrphaned(error)) {
+      console.error("[review-lens] 启动失败：", error);
+    }
   };
 
   let teardown = null;
@@ -41,11 +43,15 @@
         return;
       }
       // 已经挂着就不重复挂：SPA 内部的局部更新也会走到这里
-      if (teardown) return;
+      if (teardown) {
+        return;
+      }
 
       const entry = await load("content/entry.js");
       const result = await entry?.init();
-      if (typeof result === "function") teardown = result;
+      if (typeof result === "function") {
+        teardown = result;
+      }
     } catch (error) {
       report(error);
     }

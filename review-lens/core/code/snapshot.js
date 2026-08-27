@@ -11,11 +11,12 @@ export function sliceForReading(lines, anchorLine, options = {}) {
   const { extraLines = 0, sha, path } = options;
 
   // 旧行号在 force push 或文件被截短后会越界，硬算下去会产出 rangeStart > rangeEnd 的空区间
-  if (!(anchorLine >= 1 && anchorLine <= lines.length)) return null;
+  if (!(anchorLine >= 1 && anchorLine <= lines.length)) {
+    return null;
+  }
 
   const range = findMethodRange(lines, anchorLine);
-  const isWithinWholeMethodLimit =
-    range && range.end - range.start + 1 <= WHOLE_METHOD_LIMIT;
+  const isWithinWholeMethodLimit = range && range.end - range.start + 1 <= WHOLE_METHOD_LIMIT;
 
   // 方法找不到或太长时，底盘退回锚点附近的窗口
   const base = isWithinWholeMethodLimit
@@ -28,9 +29,7 @@ export function sliceForReading(lines, anchorLine, options = {}) {
     sha,
     path,
     isWholeMethod: Boolean(isWithinWholeMethodLimit),
-    methodName: isWithinWholeMethodLimit
-      ? methodNameAt(lines, range.start)
-      : null,
+    methodName: isWithinWholeMethodLimit ? methodNameAt(lines, range.start) : null,
     anchorLine,
     rangeStart: start,
     rangeEnd: end,
@@ -58,8 +57,12 @@ const codeOnly = (line) =>
 const countBraces = (line) => {
   const code = codeOnly(line);
   return [...code].reduce((depth, char) => {
-    if (char === "{") return depth + 1;
-    if (char === "}") return depth - 1;
+    if (char === "{") {
+      return depth + 1;
+    }
+    if (char === "}") {
+      return depth - 1;
+    }
     return depth;
   }, 0);
 };
@@ -69,8 +72,8 @@ const countBraces = (line) => {
  * 必须显式排除，否则「展开完整方法体」会只展开一个 if 块。
  */
 const NOT_A_SIGNATURE =
-  /^\s*(?:\}\s*)?(?:else\s+)?(?:if|for|while|switch|catch|synchronized|try|do|class|interface|enum|record)\b/;
-const SIGNATURE = /^\s*[\w<>\[\],@.\s]*\([^;]*\)\s*(?:throws[\w\s,.]*)?\{\s*$/;
+  /^\s*(?:}\s*)?(?:else\s+)?(?:if|for|while|switch|catch|synchronized|try|do|class|interface|enum|record)\b/;
+const SIGNATURE = /^\s*[\w<>[\],@.\s]*\([^;]*\)\s*(?:throws[\w\s,.]*)?\{\s*$/;
 
 /**
  * 从锚点行往上找最近的方法签名，再从签名处往下配平花括号找到方法结束。
@@ -79,14 +82,20 @@ const SIGNATURE = /^\s*[\w<>\[\],@.\s]*\([^;]*\)\s*(?:throws[\w\s,.]*)?\{\s*$/;
 export function findMethodRange(lines, anchorLine) {
   for (let start = anchorLine; start >= 1; start -= 1) {
     const line = lines[start - 1];
-    if (NOT_A_SIGNATURE.test(line) || !SIGNATURE.test(line)) continue;
+    if (NOT_A_SIGNATURE.test(line) || !SIGNATURE.test(line)) {
+      continue;
+    }
 
     let depth = 0;
     for (let cursor = start; cursor <= lines.length; cursor += 1) {
       depth += countBraces(lines[cursor - 1]);
-      if (depth > 0) continue;
+      if (depth > 0) {
+        continue;
+      }
       // 配平点落在锚点之前说明这个签名属于更早的方法，继续往上找外层签名
-      if (cursor >= anchorLine) return { start, end: cursor };
+      if (cursor >= anchorLine) {
+        return { start, end: cursor };
+      }
       break;
     }
   }

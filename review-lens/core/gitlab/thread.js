@@ -10,15 +10,12 @@ export const ANCHOR_SIDE = { old: "old", new: "new" };
 
 // position_type 不是 text 的 DiffNote 挂在图片或整个文件上，没有行号，进来会产出无从定位的 thread
 const isCodeComment = (note) =>
-  !note.system &&
-  note.type === "DiffNote" &&
-  note.position?.position_type === "text";
+  !note.system && note.type === "DiffNote" && note.position?.position_type === "text";
 
 function toThread(discussion, note, mrHeadSha) {
   const { position } = note;
   // 评论落在被删掉的行上时只有 old_line，此时锚点要按旧版本那一侧定位
-  const anchorSide =
-    position.new_line == null ? ANCHOR_SIDE.old : ANCHOR_SIDE.new;
+  const anchorSide = position.new_line == null ? ANCHOR_SIDE.old : ANCHOR_SIDE.new;
 
   return {
     discussionId: discussion.id,
@@ -27,10 +24,8 @@ function toThread(discussion, note, mrHeadSha) {
     createdAt: note.created_at,
     body: note.body,
     resolved: Boolean(note.resolved),
-    path:
-      anchorSide === ANCHOR_SIDE.new ? position.new_path : position.old_path,
-    anchorLine:
-      anchorSide === ANCHOR_SIDE.new ? position.new_line : position.old_line,
+    path: anchorSide === ANCHOR_SIDE.new ? position.new_path : position.old_path,
+    anchorLine: anchorSide === ANCHOR_SIDE.new ? position.new_line : position.old_line,
     anchorSide,
     position,
     // 评论写下时的 head 与 MR 当前 head 不同，说明这条评论之后代码又动过
@@ -55,21 +50,17 @@ const MAX_PAGES = 20;
 async function loadAllDiscussions(client, base) {
   const all = [];
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const batch = await client.get(
-      `${base}/discussions?per_page=${PER_PAGE}&page=${page}`,
-    );
+    const batch = await client.get(`${base}/discussions?per_page=${PER_PAGE}&page=${page}`);
     // 错误载荷不是数组，展开它只会抛一个没有 kind 的裸 TypeError，界面只能说「未知错误」
     if (!Array.isArray(batch)) {
-      throw new GitLabRequestError(
-        ERROR_KIND.unexpected,
-        0,
-        "讨论列表的响应不是预期的数组",
-      );
+      throw new GitLabRequestError(ERROR_KIND.unexpected, 0, "讨论列表的响应不是预期的数组");
     }
 
     all.push(...batch);
     // 取满一页说明后面可能还有；不满就到底了，不必读响应头
-    if (batch.length < PER_PAGE) return all;
+    if (batch.length < PER_PAGE) {
+      return all;
+    }
   }
   return all;
 }
@@ -86,11 +77,7 @@ export async function loadThreads(client, ref) {
 
   // 不可 diff 的 MR（无提交、冲突严重）没有 diff_refs，直取下一级会抛裸 TypeError
   if (!mergeRequest.diff_refs?.head_sha) {
-    throw new GitLabRequestError(
-      ERROR_KIND.notFound,
-      0,
-      "这条 MR 取不到 diff 基准",
-    );
+    throw new GitLabRequestError(ERROR_KIND.notFound, 0, "这条 MR 取不到 diff 基准");
   }
 
   const mrHeadSha = mergeRequest.diff_refs.head_sha;

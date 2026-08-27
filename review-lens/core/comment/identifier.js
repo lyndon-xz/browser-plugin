@@ -13,9 +13,10 @@ export function extractIdentifiers(body) {
   const found = [];
 
   for (const [candidate] of String(body ?? "").matchAll(CANDIDATE)) {
-    const isWorthLinking =
-      HAS_DOT_OR_CALL.test(candidate) || TYPE_NAME_PATTERN.test(candidate);
-    if (!isWorthLinking || seen.has(candidate)) continue;
+    const isWorthLinking = HAS_DOT_OR_CALL.test(candidate) || TYPE_NAME_PATTERN.test(candidate);
+    if (!isWorthLinking || seen.has(candidate)) {
+      continue;
+    }
 
     seen.add(candidate);
     found.push({ text: candidate });
@@ -29,8 +30,6 @@ const bareName = (identifier) => identifier.replace(/\(.*$/, "");
 export function locateIdentifiers(identifiers, lines) {
   return identifiers.map((text) => ({
     text,
-    lines: lines
-      .filter((line) => line.text.includes(bareName(text)))
-      .map((line) => line.number),
+    lines: lines.filter((line) => line.text.includes(bareName(text))).map((line) => line.number),
   }));
 }

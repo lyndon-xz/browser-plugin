@@ -14,14 +14,17 @@ const scriptIdFor = (origin) => `review-lens-${origin}`;
 
 /** 同步发起：返回的是 chrome 给的那个 promise，调用方 await 它，但不要在它之前 await 别的 */
 export function requestOriginAccess(chrome, origin) {
-  if (!ORIGIN_PATTERN.test(String(origin ?? ""))) return Promise.resolve(false);
+  if (!ORIGIN_PATTERN.test(String(origin ?? ""))) {
+    return Promise.resolve(false);
+  }
 
   return chrome.permissions.request({ origins: [patternFor(origin)] });
 }
 
 export async function registerOriginScripts(chrome, origin) {
-  if (!ORIGIN_PATTERN.test(String(origin ?? "")))
+  if (!ORIGIN_PATTERN.test(String(origin ?? ""))) {
     return { ok: false, reason: "bad-origin" };
+  }
 
   let existing = [];
   try {
@@ -30,8 +33,9 @@ export async function registerOriginScripts(chrome, origin) {
     // 查不到已注册列表就按「没注册过」继续，重复 id 在下面会被当成无害
     existing = [];
   }
-  if (existing.some((script) => script.id === scriptIdFor(origin)))
+  if (existing.some((script) => script.id === scriptIdFor(origin))) {
     return { ok: true };
+  }
 
   try {
     await chrome.scripting.registerContentScripts([
@@ -71,7 +75,5 @@ export async function unregisterOrigin(chrome, origin) {
     failures.push(`站点仍被授权（${error.message}）`);
   }
 
-  return failures.length
-    ? { ok: false, message: failures.join("；") }
-    : { ok: true };
+  return failures.length ? { ok: false, message: failures.join("；") } : { ok: true };
 }

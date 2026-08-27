@@ -64,9 +64,7 @@ export function createStore(storage) {
     const existing = cards.find((item) => sameThread(item.source, card.source));
     const saved = {
       ...card,
-      id:
-        existing?.id ??
-        `c_${Date.now()}_${card.source.discussionId.slice(0, 8)}`,
+      id: existing?.id ?? `c_${Date.now()}_${card.source.discussionId.slice(0, 8)}`,
       savedAt: new Date().toISOString(),
     };
 
@@ -88,9 +86,12 @@ export function createStore(storage) {
    * 所以去掉旧键并留一个待办标记，由设置页请用户按站点重填。
    */
   function migrate(settings) {
-    if (typeof settings.token !== "string") return settings;
+    if (typeof settings.token !== "string") {
+      return settings;
+    }
 
-    const { token, ...rest } = settings;
+    const rest = { ...settings };
+    delete rest.token;
     return { ...rest, needsTokenReentry: true };
   }
 

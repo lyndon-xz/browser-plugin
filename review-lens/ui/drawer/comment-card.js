@@ -16,6 +16,8 @@ function renderShot(shot) {
   link.href = url;
   link.target = "_blank";
   link.rel = "noreferrer";
+  // 预览位只露出截图顶部，得说一声还有下文，否则读者以为图就这么大
+  link.title = "点开看完整截图";
 
   const image = document.createElement("img");
   image.className = "shot";
@@ -35,10 +37,14 @@ function writeIdentifiers(target, text, context) {
   let cursor = 0;
 
   for (const { text: identifier } of extractIdentifiers(text)) {
-    if (!linkable.has(identifier)) continue;
+    if (!linkable.has(identifier)) {
+      continue;
+    }
 
     const at = text.indexOf(identifier, cursor);
-    if (at < 0) continue;
+    if (at < 0) {
+      continue;
+    }
 
     target.append(document.createTextNode(text.slice(cursor, at)));
 
@@ -56,8 +62,11 @@ function writeIdentifiers(target, text, context) {
 // 评论与回复共用：文本段做标识符 chip，附件段渲染成截图
 function writeCommentBody(target, text, context) {
   for (const piece of splitAttachments(text, context.site)) {
-    if (piece.kind === "image") target.append(renderShot(piece));
-    else writeIdentifiers(target, piece.text, context);
+    if (piece.kind === "image") {
+      target.append(renderShot(piece));
+    } else {
+      writeIdentifiers(target, piece.text, context);
+    }
   }
 }
 
@@ -99,7 +108,9 @@ export function renderCommentCard(request) {
 export function renderReplies(request) {
   const { replies, ...context } = request;
 
-  if (!replies?.length) return null;
+  if (!replies?.length) {
+    return null;
+  }
 
   const list = document.createElement("section");
   list.className = "replies";

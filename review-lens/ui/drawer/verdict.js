@@ -37,9 +37,7 @@ export function renderHead(request) {
 export function describeSelection(state) {
   const { then, diffOps } = state;
 
-  const scope = then.methodName
-    ? `${then.methodName}()`
-    : then.path.split("/").at(-1);
+  const scope = then.methodName ? `${then.methodName}()` : then.path.split("/").at(-1);
   const span = `${then.rangeStart}–${then.rangeEnd} 行`;
   /*
    * 一处修改会同时产生 remove 与 add 两个 op，直接数 op 个数会把「改了 1 行」说成 2 行，
@@ -67,7 +65,9 @@ const BADGES = {
 };
 
 export function badgeFor(state) {
-  if (state.state) return BADGES[state.state] ?? null;
+  if (state.state) {
+    return BADGES[state.state] ?? null;
+  }
   return state.thread.isOutdated ? BADGES[COMPARE_STATE.changed] : null;
 }
 
@@ -112,7 +112,9 @@ export function renderNoCode(state) {
       : "方法被改名、挪走或删除了，而且没查到评论之后针对这个文件的提交记录。";
 
     box.append(title, detail);
-    if (state.commits?.length) box.append(renderCommitTrail(state.commits));
+    if (state.commits?.length) {
+      box.append(renderCommitTrail(state.commits));
+    }
     return box;
   }
 
