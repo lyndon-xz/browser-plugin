@@ -3,14 +3,15 @@
  *
  * 职责：
  *   1) Alt+Q 全局快捷键（commands: toggle-enable）翻转启用状态、切图标、通知 content（M1-S6，V-4）
- *   2) 代理 content 的 DeepSeek 请求（M3-S2，V-6/V-7）：规避宿主页 CSP、隔离 API key（TD-4）
+ *   2) 代理 content 的 DeepSeek 请求（M3-S2 / I1-S4，V-6/V-7/V-8）：
+ *      从 chrome.storage.local 读 key，规避宿主页 CSP（TD-4、TD-7）
  */
 importScripts("utils/storage.js");
 importScripts("utils/deepseek.js");
 
-// DeepSeek API key：个人使用直接写死（需求 §5.1 Q-6，接受泄露风险，不公开分发）
-const DEEPSEEK_API_KEY = "";
 const REQUEST_TIMEOUT_MS = 5000; // 需求 §6
+const MISSING_KEY_MESSAGE =
+  "还没填写 DeepSeek 密钥，点工具栏图标打开弹窗即可";
 
 const ICON_SIZES = [16, 32, 48, 128];
 
@@ -63,8 +64,13 @@ chrome.commands.onCommand.addListener(async (command) => {
   }
 });
 
-// 调用 DeepSeek：题库未命中时的 AI 兜底
+// 调用 DeepSeek：题库未命中时的 AI 兜底。空 key 不发请求（V-8）。
 async function askDeepSeek(text) {
+  const apiKey = await StorageHelper.getApiKey();
+  if (!apiKey) {
+    return { missingKey: true };
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -72,7 +78,7 @@ async function askDeepSeek(text) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(DeepSeek.buildRequestBody(text)),
       signal: controller.signal,
@@ -91,7 +97,13 @@ async function askDeepSeek(text) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || message.action !== "askAI") return;
   askDeepSeek(message.text)
-    .then((result) => sendResponse({ ok: true, ...result }))
+    .then((result) => {
+      if (result && result.missingKey) {
+        sendResponse({ ok: false, error: MISSING_KEY_MESSAGE });
+        return;
+      }
+      sendResponse({ ok: true, ...result });
+    })
     .catch((err) => {
       const aborted = err && err.name === "AbortError";
       sendResponse({

@@ -1,7 +1,7 @@
 # 实现计划
 
-> 模块映射（requirement.md §3）：M1 = US-1+US-2（V-1~V-4）；M2 = US-3（V-5 完整题库）；M3 = US-4（V-6/V-7 DeepSeek 兜底）。
-> 目录与文件命名见 architecture.md §6；纯逻辑模块（matcher/deepseek）用 UMD 包装以兼容 Vitest（TD-2）。
+> 模块映射（requirement.md §3）：M1 = US-1+US-2（V-1~V-4）；M2 = US-3（V-5）；M3 = US-4（V-6/V-7）；M4/I1 = US-5（V-8 popup 本机密钥）。
+> 目录与文件命名见 architecture.md §6。测试策略：无单测（TD-6），步骤卡测试点均为 —。
 
 ## M1：走通骨架（walking skeleton）
 
@@ -18,7 +18,7 @@
 | 功能描述     | 建立 `exam-helper/` 扩展目录骨架与 MV3 manifest、开发期 Vitest 工具链、种子题库；跑通一次空测试确认工具链就绪                                                                           |
 | 涉及文件     | `exam-helper/manifest.json`、`package.json`、`vitest.config.js`、`exam-helper/data/questions.js`（种子 3~5 题）、`exam-helper/icons/`（复用/仿 search-sort）、`__tests__/smoke.test.js` |
 | 对应验收标准 | —（基础设施，支撑 V-1~V-4）                                                                                                                                                             |
-| 测试点       | 一个 smoke 测试断言 `EXAM_QUESTIONS` 为非空数组且每项含 `id/type/title/answer` 字段                                                                                                     |
+| 测试点       | —                                                                                                                                                                                      |
 | 前置依赖     | 无                                                                                                                                                                                      |
 | 可并行       | 否（其余步骤的地基）                                                                                                                                                                    |
 
@@ -39,7 +39,7 @@
 | 功能描述     | 实现文本归一化与题库模糊匹配纯函数，支持顺序不同、多余空格、部分截断仍能命中                                                          |
 | 涉及文件     | `exam-helper/utils/matcher.js`、`__tests__/matcher.test.js`                                                                           |
 | 对应验收标准 | V-2                                                                                                                                   |
-| 测试点       | 归一化去空格/全半角/大小写/标点；完全一致命中；乱序词命中；多余空格命中；截断片段命中；无关文本返回 null；返回命中项含 answer/explain |
+| 测试点       | —                                                                                                                                 |
 | 前置依赖     | M1-S1                                                                                                                                 |
 | 可并行       | 是（与 M1-S3、M1-S4 不同文件）                                                                                                        |
 
@@ -60,7 +60,7 @@
 | 功能描述     | 创建 Shadow DOM host，按状态渲染气泡（命中/loading/错误三态），定位到选区下方，提供 hide                                                       |
 | 涉及文件     | `exam-helper/content/bubble.js`、`__tests__/bubble.test.js`（jsdom 环境）                                                                      |
 | 对应验收标准 | V-3（本模块验收仅走命中态；loading/错误态供 M3 消费）                                                                                          |
-| 测试点       | `show` 后存在 shadow-root 且样式在 shadow 内、不泄露到 document；命中态渲染答案徽章+解析+来源标签；`hide` 后 host 尺寸为 0；定位超出视口时上翻 |
+| 测试点       | —                                                                                                                                          |
 | 前置依赖     | M1-S1                                                                                                                                          |
 | 可并行       | 是（与 M1-S2、M1-S4 不同文件）                                                                                                                 |
 
@@ -80,7 +80,7 @@
 | 功能描述     | 封装 `chrome.storage.local` 的启用状态读写，默认启用                               |
 | 涉及文件     | `exam-helper/utils/storage.js`、`__tests__/storage.test.js`（mock chrome.storage） |
 | 对应验收标准 | —（支撑 V-4）                                                                      |
-| 测试点       | `getEnabled` 未设置时返回默认 true；`setEnabled(false)` 后 `getEnabled` 返回 false |
+| 测试点       | —                                                                              |
 | 前置依赖     | M1-S1                                                                              |
 | 可并行       | 是（与 M1-S2、M1-S3 不同文件）                                                     |
 
@@ -99,7 +99,7 @@
 | 功能描述     | 监听选区变化，debounce 300ms 取选区文本调用 matcher，命中则显示命中气泡、取消选区则隐藏；受启用标志控制；监听后台切换消息 |
 | 涉及文件     | `exam-helper/content.js`                                                                                                  |
 | 对应验收标准 | V-1、V-4（禁用后不触发）                                                                                                  |
-| 测试点       | 主要经浏览器手动验收（§8）；纯逻辑分支（debounce、enabled 判定）如可抽出则补单测                                          |
+| 测试点       | —                                                                                                                     |
 | 前置依赖     | M1-S2、M1-S3、M1-S4                                                                                                       |
 | 可并行       | 是（与 M1-S6 不同文件，均依赖前批）                                                                                       |
 
@@ -121,7 +121,7 @@
 | 功能描述     | Alt+Q 全局切换启用状态，更新扩展图标，并通知当前标签的 content script                       |
 | 涉及文件     | `exam-helper/background.js`、`manifest.json`（commands 段）                                 |
 | 对应验收标准 | V-4                                                                                         |
-| 测试点       | 主要经浏览器手动验收（§8）；toggle 后 storage 值翻转、图标切换、向当前 tab 发 `toggle` 消息 |
+| 测试点       | —                                                                                       |
 | 前置依赖     | M1-S4                                                                                       |
 | 可并行       | 是（与 M1-S5 不同文件，均依赖前批）                                                         |
 
@@ -159,7 +159,7 @@
 | 功能描述     | 用 agent-browser 抓取 CSDN 博文与阿里云课程题目，整理为结构化数据，替换/扩充 `data/questions.js` 为全量题库 |
 | 涉及文件     | `exam-helper/data/questions.js`                                                                             |
 | 对应验收标准 | V-5                                                                                                         |
-| 测试点       | 见 M2-S2（数据完整性单测）                                                                                  |
+| 测试点       | —                                                                                                          |
 | 前置依赖     | M1 完成；题库来源可访问（agent-browser 真实浏览器；CSDN/阿里云 403 需真实浏览器渲染，必要时用户提供全文）   |
 | 可并行       | 否                                                                                                          |
 
@@ -181,7 +181,7 @@
 | 功能描述     | 对全量题库做结构完整性单测，并在全量题库上抽样验证匹配引擎命中正确                                |
 | 涉及文件     | `__tests__/questions.test.js`、`__tests__/matcher.fulldb.test.js`                                 |
 | 对应验收标准 | V-5                                                                                               |
-| 测试点       | 每题 answer 非空、type 合法、id 唯一、无重复题干；抽取若干真题片段经 matcher 命中且答案与原文一致 |
+| 测试点       | —                                                                                             |
 | 前置依赖     | M2-S1                                                                                             |
 | 可并行       | 否                                                                                                |
 
@@ -206,7 +206,7 @@
 | 功能描述     | 实现 DeepSeek 请求体构造与响应文本解析为结构化答案的纯逻辑（fetch 注入，便于测试）                                                                                                                               |
 | 涉及文件     | `exam-helper/utils/deepseek.js`、`__tests__/deepseek.test.js`                                                                                                                                                    |
 | 对应验收标准 | V-6、V-7                                                                                                                                                                                                         |
-| 测试点       | `buildRequest(text)` 生成含 system 提示 + user 文本、model=deepseek-chat、temperature=0 的请求体；`parseResponse(json)` 从 `choices[0].message.content` 解析出 `{answer,explain}`；响应结构异常/空时抛可捕获错误 |
+| 测试点       | —                                                                                                                                                                                                            |
 | 前置依赖     | M1 完成                                                                                                                                                                                                          |
 | 可并行       | 是（纯逻辑独立文件，可与 M2 并行）                                                                                                                                                                               |
 
@@ -225,13 +225,13 @@
 | 功能描述     | background 接收 content 的 askAI 消息，调用 DeepSeek API（含超时/错误处理），返回结构化答案或错误  |
 | 涉及文件     | `exam-helper/background.js`                                                                        |
 | 对应验收标准 | V-6、V-7                                                                                           |
-| 测试点       | 经浏览器/集成验收；成功返回 `{answer,explain}`；网络异常/超时/key 无效返回 `{error}`（不抛未捕获） |
+| 测试点       | —                                                                                              |
 | 前置依赖     | M3-S1                                                                                              |
 | 可并行       | 否                                                                                                 |
 
 **实现要点**：
 
-- `importScripts("utils/deepseek.js")`；`onMessage {action:"askAI", text}` → `fetch` DeepSeek（key 写死，TD-4）→ 5s 超时（AbortController，需求 §6）→ `parseResponse` → `sendResponse`；全程 try/catch 转错误对象。
+- `importScripts("utils/deepseek.js")`；`onMessage {action:"askAI", text}` → 从 storage 读 key → `fetch` DeepSeek → 5s 超时（AbortController，需求 §6）→ `parseResponse` → `sendResponse`；全程 try/catch 转错误对象。空 key 不发请求（I1 / TD-7）。
 
 ---
 
@@ -244,7 +244,7 @@
 | 功能描述     | matcher 未命中时，气泡先渲染 loading，向 background 请求 AI，返回后渲染 AI 答案态或错误态 |
 | 涉及文件     | `exam-helper/content.js`                                                                  |
 | 对应验收标准 | V-6、V-7                                                                                  |
-| 测试点       | 经浏览器手动验收：未命中显示“AI 推理中…”→ 显示答案；模拟失败显示错误提示不白屏            |
+| 测试点       | —                                                                                     |
 | 前置依赖     | M3-S2（bubble 三态已在 M1-S3 就绪）                                                       |
 | 可并行       | 否                                                                                        |
 
@@ -262,8 +262,115 @@
 | 第 2 批 | M3-S2 | 否       | 依赖 M3-S1               |
 | 第 3 批 | M3-S3 | 否       | 依赖 M3-S2               |
 
-> **M3 验收结果**：deepseek.test.js 8 例（请求体/JSON解析/围栏/字母规整/文本兜底/异常）通过，全套 **60 单测绿**。真实浏览器验收：V-7 用真实无效 key（HTTP 401）验证——未命中→loading→错误态「⚠ AI 请求失败，请检查网络连接」；V-6 用本地 mock 桩返回 200 验证整条 content→background→parse→渲染路径——显示「A C / 多选 / 🤖 AI 推理 / 解析」，留证 `evidence/screenshots/M3-V6-ai-answer.png`。
-> **DeepSeek key**：初始 key `sk-…2a87` 失效（401）；已替换为用户提供的有效 key `sk-…c17b`，真实 AI 答案端到端验证通过（留证 `evidence/screenshots/M3-V6-ai-answer-live.png`）。
+> **M3 验收结果**：真实浏览器验收 V-6/V-7 通过（留证 `evidence/screenshots/M3-V6-ai-answer-live.png`）。当时全套单测绿；I1 起拆除单测、密钥改 popup 本机配置。
+
+---
+
+## 迭代 I1：本机密钥 + 拆除单测
+
+> 级别：L1（US-5/V-8）+ L2（popup 密钥区）+ L3（无单测 TD-6、key 存 storage TD-7）+ L4。
+> 视觉稿见 `designs/popup-prototype.html`，过 GATE-2 后编码 I1-S2～S4。
+
+### I1-S1: 拆除单测工具链
+
+- [x] 完成
+
+| 属性         | 内容 |
+| ------------ | ---- |
+| 功能描述     | 删除 exam-helper 全部单测文件与仅服务测试的配置/依赖（Vitest、jsdom、package.json、vitest.config.js、node_modules） |
+| 涉及文件     | `exam-helper/__tests__/`、`package.json`、`package-lock.json`、`vitest.config.js`、`node_modules/` |
+| 对应验收标准 | —（Q-7 / TD-6） |
+| 测试点       | — |
+| 前置依赖     | 无 |
+| 可并行       | 否（先清工具链） |
+
+**实现要点**：
+
+- 按 skill §11.2：删除测试文件与只为测试服务的配置/依赖，不留着不跑。
+- 既有步骤卡测试点已改为 —。
+
+---
+
+### I1-S2: storage 增加 API key 读写
+
+- [x] 完成
+
+| 属性         | 内容 |
+| ------------ | ---- |
+| 功能描述     | `StorageHelper` 增加 `getApiKey()` / `setApiKey(string)`，读写 `chrome.storage.local.deepseekApiKey` |
+| 涉及文件     | `exam-helper/utils/storage.js` |
+| 对应验收标准 | V-8 |
+| 测试点       | — |
+| 前置依赖     | I1-S1 |
+| 可并行       | 是（与 I1-S3 不同文件） |
+
+**实现要点**：
+
+- 未设置返回空字符串；写入前 trim；不把 key 打到 console。
+
+---
+
+### I1-S3: popup 本机密钥面板
+
+- [x] 完成
+
+| 属性         | 内容 |
+| ------------ | ---- |
+| 功能描述     | 按设计稿在 popup 增加本机密钥区：密码框、保存到本机、已保存只露末 4 位 |
+| 涉及文件     | `exam-helper/popup/popup.html`、`popup.css`、`popup.js` |
+| 对应验收标准 | V-8 |
+| 测试点       | — |
+| 前置依赖     | I1-S2；`designs/popup-prototype.html` 过 GATE-2 |
+| 可并行       | 否（依赖 S2 的 storage API） |
+
+**实现要点**：
+
+- 视觉对齐 `designs/popup-prototype.html`（软白卡片、荧光笔保存钮、320px）。
+- popup 加载 `utils/storage.js` 再跑 `popup.js`。
+- 空输入时保存钮禁用；保存后清空输入框。
+
+---
+
+### I1-S4: background 读 storage key，去掉写死常量
+
+- [x] 完成
+
+| 属性         | 内容 |
+| ------------ | ---- |
+| 功能描述     | `askDeepSeek` 从 storage 取 key；空则不发请求，返回「还没填写 DeepSeek 密钥，点工具栏图标打开弹窗即可」；删除源码中的明文 key 常量 |
+| 涉及文件     | `exam-helper/background.js` |
+| 对应验收标准 | V-8、V-6、V-7 |
+| 测试点       | — |
+| 前置依赖     | I1-S2 |
+| 可并行       | 否 |
+
+**实现要点**：
+
+- 错误文案与 design.md DD-6 / 气泡错误态一致。
+- 源码、注释、文档均不得再出现真实 key。
+
+---
+
+### I1-S5: 气泡样式对齐确认稿
+
+- [x] 完成
+
+| 属性         | 内容 |
+| ------------ | ---- |
+| 功能描述     | 气泡 Shadow DOM 样式改为半透明白 + 毛玻璃 + 细描边，答案字母荧光笔划线 |
+| 涉及文件     | `exam-helper/content/bubble.js` |
+| 对应验收标准 | V-1、V-3、V-8 |
+| 测试点       | — |
+| 前置依赖     | GATE-2 |
+| 可并行       | 是（与 S3/S4 不同文件） |
+
+---
+
+| 批次    | 步骤            | 是否并行 | 备注                          |
+| ------- | --------------- | -------- | ----------------------------- |
+| 第 1 批 | I1-S1           | 否       | 先拆单测                      |
+| 第 2 批 | I1-S2           | 否       | storage API                   |
+| 第 3 批 | I1-S3、I1-S4、I1-S5 | 是       | popup / background / bubble 不同文件 |
 
 ---
 
@@ -274,3 +381,5 @@
 | v1   | 2026-07-22 20:03    | 初始版本                                                                                 | 全部     |
 | v2   | 2026-07-22 20:58    | M1 全部步骤完成并标记；补 M1 验收结果与计划级自检结论；content_scripts 顺序补 storage.js | M1       |
 | v3   | 2026-07-22 (恢复后) | M2、M3 全部步骤完成并标记；补 M2/M3 验收结果（77 题题库、DeepSeek 兜底 V-6/V-7）         | M2、M3   |
+| v4   | 2026-08-27 17:27    | 迭代 I1：切无单测（步骤卡测试点改 —）；popup 本机密钥（V-8）；拆除 Vitest 工具链         | I1、M4、V-8 |
+| v5   | 2026-08-27 18:21    | I1-S2～S5 完成：storage key、popup、background 去明文、气泡样式对齐确认稿               | I1 |

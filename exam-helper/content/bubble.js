@@ -19,131 +19,144 @@
   let shadowRoot = null;
   let rootEl = null;
 
-  // 注入 shadow-root 的样式：深色毛玻璃卡片，视觉对齐 designs/bubble-prototype.html
+  // 注入 shadow-root 的样式：半透明白 + 毛玻璃，对齐 designs/bubble-prototype.html
   const STYLE_TEXT = `
     :host { all: initial; }
     .bubble-root {
       position: fixed;
       z-index: 2147483647;
       pointer-events: none;
-      font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, "PingFang SC", "Segoe UI", sans-serif;
     }
     .bubble {
       position: relative;
-      width: 360px;
+      width: 340px;
       box-sizing: border-box;
-      background: #1a1a2e;
-      color: #e0e0e0;
-      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      color: #2f3640;
+      border: 1px solid rgba(47, 54, 64, 0.1);
+      border-radius: 16px;
       padding: 14px 16px;
       font-size: 13px;
-      line-height: 1.6;
-      box-shadow: 0 8px 32px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.06);
-      animation: bubbleFadeIn .15s ease-out;
+      line-height: 1.65;
+      box-shadow:
+        0 14px 36px rgba(47, 54, 64, 0.14),
+        0 1px 0 rgba(255, 255, 255, 0.9) inset;
+      animation: bubbleFadeIn .18s ease-out;
     }
     .bubble::before {
       content: "";
       position: absolute;
       top: -6px;
-      left: 24px;
+      left: 22px;
       width: 12px;
       height: 12px;
-      background: #1a1a2e;
+      background: #fff;
+      border-left: 1px solid rgba(47, 54, 64, 0.1);
+      border-top: 1px solid rgba(47, 54, 64, 0.1);
       transform: rotate(45deg);
-      border-radius: 2px;
+      border-radius: 3px;
     }
     .answer-line {
       display: flex;
       align-items: baseline;
-      gap: 8px;
+      gap: 10px;
       margin-bottom: 8px;
     }
     .answer-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      background: #16a34a;
-      color: #fff;
+      display: inline-block;
       font-weight: 700;
-      font-size: 15px;
-      letter-spacing: 2px;
-      padding: 2px 10px;
-      border-radius: 5px;
+      font-size: 16px;
+      letter-spacing: 3px;
+      padding: 1px 8px 2px;
+      background: linear-gradient(transparent 58%, #ffe58a 58%);
+      border-radius: 4px;
       flex-shrink: 0;
     }
-    .answer-type { font-size: 11px; color: #9ca3af; }
+    .answer-type { font-size: 11px; color: #6b7380; }
     .answer-explain {
-      color: #c4c4c4;
-      font-size: 12px;
-      line-height: 1.6;
-      border-top: 1px solid rgba(255,255,255,.08);
-      padding-top: 8px;
-      margin-top: 4px;
+      color: #5a6270;
+      font-size: 12.5px;
+      line-height: 1.65;
     }
     .source-tag {
       display: inline-block;
-      margin-top: 6px;
-      font-size: 10px;
-      color: #6b7280;
-      background: rgba(255,255,255,.06);
-      padding: 1px 6px;
-      border-radius: 3px;
+      margin-top: 8px;
+      font-size: 11px;
+      color: #6b7380;
     }
     .bubble-loading {
       position: relative;
-      background: #1a1a2e;
-      color: #9ca3af;
-      border-radius: 10px;
-      padding: 10px 16px;
-      font-size: 12px;
-      box-shadow: 0 8px 32px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.06);
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      color: #6b7380;
+      border: 1px solid rgba(47, 54, 64, 0.1);
+      border-radius: 16px;
+      padding: 11px 16px;
+      font-size: 13px;
+      box-shadow:
+        0 14px 36px rgba(47, 54, 64, 0.14),
+        0 1px 0 rgba(255, 255, 255, 0.9) inset;
       display: flex;
       align-items: center;
-      gap: 8px;
-      animation: bubbleFadeIn .15s ease-out;
+      gap: 10px;
+      animation: bubbleFadeIn .18s ease-out;
     }
     .bubble-loading::before {
       content: "";
       position: absolute;
       top: -6px;
-      left: 24px;
+      left: 22px;
       width: 12px;
       height: 12px;
-      background: #1a1a2e;
+      background: #fff;
+      border-left: 1px solid rgba(47, 54, 64, 0.1);
+      border-top: 1px solid rgba(47, 54, 64, 0.1);
       transform: rotate(45deg);
-      border-radius: 2px;
+      border-radius: 3px;
     }
     .spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(255,255,255,.15);
-      border-top-color: #60a5fa;
+      width: 13px;
+      height: 13px;
+      border: 2px solid #eef1f6;
+      border-top-color: #5e8f7b;
       border-radius: 50%;
-      animation: spin .6s linear infinite;
+      animation: spin .7s linear infinite;
     }
     .bubble-error {
       position: relative;
-      background: #1a1a2e;
-      color: #f87171;
-      border-radius: 10px;
-      padding: 10px 16px;
-      font-size: 12px;
-      box-shadow: 0 8px 32px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.06);
-      animation: bubbleFadeIn .15s ease-out;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      color: #c45c5c;
+      border: 1px solid rgba(47, 54, 64, 0.1);
+      border-radius: 16px;
+      padding: 11px 16px;
+      font-size: 13px;
+      line-height: 1.6;
+      box-shadow:
+        0 14px 36px rgba(47, 54, 64, 0.14),
+        0 1px 0 rgba(255, 255, 255, 0.9) inset;
+      animation: bubbleFadeIn .18s ease-out;
     }
     .bubble-error::before {
       content: "";
       position: absolute;
       top: -6px;
-      left: 24px;
+      left: 22px;
       width: 12px;
       height: 12px;
-      background: #1a1a2e;
+      background: #fff;
+      border-left: 1px solid rgba(47, 54, 64, 0.1);
+      border-top: 1px solid rgba(47, 54, 64, 0.1);
       transform: rotate(45deg);
-      border-radius: 2px;
+      border-radius: 3px;
     }
     @keyframes bubbleFadeIn {
-      from { opacity: 0; transform: translateY(4px); }
+      from { opacity: 0; transform: translateY(6px); }
       to   { opacity: 1; transform: translateY(0); }
     }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -185,13 +198,17 @@
     const sourceLabel =
       data && data.source === "ai" ? "🤖 AI 推理" : "📚 题库命中";
 
+    const explainHtml = explain
+      ? `<div class="answer-explain">${escapeHtml(explain)}</div>`
+      : "";
+
     return `
       <div class="bubble">
         <div class="answer-line">
           <span class="answer-badge">${escapeHtml(answerText)}</span>
           <span class="answer-type">${typeLabel}</span>
         </div>
-        <div class="answer-explain">${escapeHtml(explain)}</div>
+        ${explainHtml}
         <span class="source-tag">${sourceLabel}</span>
       </div>
     `;
@@ -209,7 +226,7 @@
   function renderError(data) {
     const message = data && data.message ? data.message : "发生未知错误";
     return `
-      <div class="bubble-error">⚠ ${escapeHtml(message)}</div>
+      <div class="bubble-error">${escapeHtml(message)}</div>
     `;
   }
 

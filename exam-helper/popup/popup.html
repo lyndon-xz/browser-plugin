@@ -9,15 +9,30 @@
   <body>
     <div class="wrap">
       <h1>Exam Helper</h1>
-      <div class="status">
-        <span class="dot" id="dot"></span>
+      <div class="status" id="status">
+        <span class="glow"></span>
         <span id="status-text">读取中…</span>
       </div>
-      <p class="hint">选中题目文字，答案气泡自动浮现在选区下方。</p>
-      <p class="hint">
-        按 <kbd>Alt</kbd>+<kbd>Q</kbd> 全局启用 / 禁用自动匹配。
-      </p>
+      <p class="hint">选中题目文字，答案会轻轻浮在选区下面。</p>
+      <p class="hint">按 <kbd>Alt</kbd> + <kbd>Q</kbd> 随时开关。</p>
+
+      <section class="pass" aria-labelledby="pass-title">
+        <div class="pass-title" id="pass-title">本机密钥</div>
+        <p class="pass-sub">只留在这台电脑里，不会写进源码。</p>
+        <div class="pass-well" id="well">
+          <input
+            id="key"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="粘贴 DeepSeek API key"
+          />
+          <button type="button" id="save" disabled>保存</button>
+        </div>
+        <p class="pass-meta" id="meta">还没填 — 题库没有的题暂时没法问 AI</p>
+      </section>
     </div>
+    <script src="../utils/storage.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

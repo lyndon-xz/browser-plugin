@@ -1,22 +1,24 @@
 /**
- * StorageHelper：封装 chrome.storage.local 的“启用状态”读写。
+ * StorageHelper：封装 chrome.storage.local 的启用状态与 API key。
  *
- * 支撑 V-4（Alt+Q 全局开关）：读写扩展是否启用的持久化状态。
+ * 支撑 V-4（Alt+Q 开关）与 V-8（popup 本机密钥）。
  *
- * 设计要点（architecture.md TD-2）：
- *   - UMD 包装：浏览器作普通脚本加载时挂全局；Node/Vitest 下可 require/import。
- *   - MV3 的 chrome.storage.local.get/set 支持 Promise 形式，直接 await。
- *   - 对 chrome 未定义 / 读取异常做健壮处理，读失败时回退默认值 true。
- *
- * API（均返回 Promise）：
- *   - getEnabled(): Promise<boolean>  未设置时返回默认值 true
- *   - setEnabled(bool): Promise<void>
+ * UMD：浏览器普通脚本 / importScripts 挂全局。
  */
 (function (global) {
   "use strict";
 
-  const KEY = "enabled";
+  const ENABLED_KEY = "enabled";
+  const API_KEY = "deepseekApiKey";
   const DEFAULT_ENABLED = true;
+
+  function hasLocalStorage() {
+    return (
+      typeof chrome !== "undefined" &&
+      chrome.storage &&
+      chrome.storage.local
+    );
+  }
 
   const StorageHelper = {
     /**
@@ -25,16 +27,10 @@
      */
     async getEnabled() {
       try {
-        if (
-          typeof chrome === "undefined" ||
-          !chrome.storage ||
-          !chrome.storage.local
-        ) {
-          return DEFAULT_ENABLED;
-        }
-        const result = await chrome.storage.local.get(KEY);
-        if (result && typeof result[KEY] === "boolean") {
-          return result[KEY];
+        if (!hasLocalStorage()) return DEFAULT_ENABLED;
+        const result = await chrome.storage.local.get(ENABLED_KEY);
+        if (result && typeof result[ENABLED_KEY] === "boolean") {
+          return result[ENABLED_KEY];
         }
         return DEFAULT_ENABLED;
       } catch (e) {
@@ -48,14 +44,34 @@
      * @returns {Promise<void>}
      */
     async setEnabled(bool) {
-      if (
-        typeof chrome === "undefined" ||
-        !chrome.storage ||
-        !chrome.storage.local
-      ) {
-        return;
+      if (!hasLocalStorage()) return;
+      await chrome.storage.local.set({ [ENABLED_KEY]: Boolean(bool) });
+    },
+
+    /**
+     * 读取本机 DeepSeek API key；未设置返回空字符串。
+     * @returns {Promise<string>}
+     */
+    async getApiKey() {
+      try {
+        if (!hasLocalStorage()) return "";
+        const result = await chrome.storage.local.get(API_KEY);
+        const value = result && result[API_KEY];
+        return typeof value === "string" ? value.trim() : "";
+      } catch (e) {
+        return "";
       }
-      await chrome.storage.local.set({ [KEY]: Boolean(bool) });
+    },
+
+    /**
+     * 写入本机 DeepSeek API key（trim 后存储）。
+     * @param {string} key
+     * @returns {Promise<void>}
+     */
+    async setApiKey(key) {
+      if (!hasLocalStorage()) return;
+      const trimmed = String(key == null ? "" : key).trim();
+      await chrome.storage.local.set({ [API_KEY]: trimmed });
     },
   };
 

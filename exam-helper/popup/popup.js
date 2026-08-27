@@ -1,27 +1,61 @@
 /**
- * popup.js：读取并展示当前启用状态（非核心路径，随参考项目结构提供）。
- * 状态由 Alt+Q 快捷键切换（见 background.js）；此处只读展示。
+ * popup.js：启用状态展示 + 本机 DeepSeek 密钥配置（V-8）。
  */
 (function () {
   "use strict";
 
-  const dot = document.getElementById("dot");
+  const statusEl = document.getElementById("status");
   const statusText = document.getElementById("status-text");
+  const input = document.getElementById("key");
+  const save = document.getElementById("save");
+  const well = document.getElementById("well");
+  const meta = document.getElementById("meta");
 
-  function render(enabled) {
-    dot.classList.toggle("on", enabled);
-    dot.classList.toggle("off", !enabled);
-    statusText.textContent = enabled ? "已启用（自动匹配中）" : "已禁用";
+  function maskTail(key) {
+    const tail = String(key).slice(-4);
+    return "已保存在本机 · sk-••••" + tail;
   }
+
+  function renderEnabled(enabled) {
+    statusEl.classList.toggle("off", !enabled);
+    statusText.textContent = enabled ? "已启用 · 自动匹配中" : "已禁用";
+  }
+
+  function renderKey(key) {
+    if (key) {
+      well.classList.add("saved");
+      meta.classList.add("ok");
+      meta.textContent = maskTail(key);
+    } else {
+      well.classList.remove("saved");
+      meta.classList.remove("ok");
+      meta.textContent = "还没填 — 题库没有的题暂时没法问 AI";
+    }
+  }
+
+  input.addEventListener("input", function () {
+    save.disabled = input.value.trim().length === 0;
+  });
+
+  save.addEventListener("click", function () {
+    const value = input.value.trim();
+    if (!value) return;
+    StorageHelper.setApiKey(value).then(function () {
+      input.value = "";
+      save.disabled = true;
+      renderKey(value);
+    });
+  });
 
   async function load() {
     try {
-      const result = await chrome.storage.local.get("enabled");
-      const enabled =
-        typeof result.enabled === "boolean" ? result.enabled : true;
-      render(enabled);
+      const enabled = await StorageHelper.getEnabled();
+      const key = await StorageHelper.getApiKey();
+      renderEnabled(enabled);
+      renderKey(key);
     } catch (e) {
-      render(true);
+      renderEnabled(true);
+      renderKey("");
     }
   }
 

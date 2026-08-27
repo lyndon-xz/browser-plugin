@@ -24,6 +24,7 @@
 | V-5  | M2       | 扩展已加载，全量题库已就位   | 选中题库中（非种子）真题的题干                                        | 气泡显示该题正确答案，与原文一致                                   | 命中气泡截图                            |
 | V-6  | M3       | 扩展已加载                   | 选中题库中没有的题目                                                  | 气泡先显示「AI 推理中…」，随后显示 DeepSeek 返回答案（🤖 AI 推理） | AI 答案气泡截图                         |
 | V-7  | M3       | 扩展已加载，DeepSeek 不可用  | 选中题库外题目触发 AI 请求                                            | 气泡显示友好错误提示，不白屏/崩溃                                  | 错误气泡                                |
+| V-8  | M4 / I1  | 扩展已加载，storage 中无 key | 1. 打开 popup 2. 粘贴 key 并保存到本机 3. 选中题库外题目 4. 清空 key 后再选中 | 保存后只露末 4 位；配置后 AI 兜底可用；未配置时气泡显示「还没填写 DeepSeek 密钥，点工具栏图标打开弹窗即可」，不发请求 | popup 已保存态截图 / 未配置错误气泡 |
 
 ---
 
@@ -33,7 +34,7 @@
 | --------- | ----------------------------------------------------------------------- |
 | 交付形态  | Web/前端 — Chrome MV3 扩展                                              |
 | 启动/调用 | `agent-browser --extension <workspace>/exam-helper open --headed <url>` |
-| 测试命令  | `cd exam-helper && npx vitest --run`                                    |
+| 测试命令  | —（无单测）                                                             |
 | 验收工具  | agent-browser（真实 Chrome via CDP） + 手动确认                         |
 | 访问入口  | 任意含题库题目文本的网页（M1 验收用本地 fixture http 页）               |
 | 前置数据  | 种子题库 `data/questions.js`（4 题，含 single/multi）                   |
@@ -74,9 +75,18 @@ evidence/screenshots/M<N>-V<M>-<description>.png
 | V-6  | M3       | ✅ 通过（真实 key） | `evidence/screenshots/M3-V6-ai-answer-live.png` | 换用有效 key `sk-…c17b` 后，选中题库外题目（Python 装饰器）→ loading → 真实 DeepSeek 返回并渲染 AI 答案态「A / 🤖 AI 推理 / 解析：装饰器本质是高阶函数，且可以装饰类(@classmethod)，B错误」。（先前另用本地 mock 桩验证过整条 content→background→parse→渲染路径，见 `M3-V6-ai-answer.png`） |
 | V-7  | M3       | ✅ 通过             | 见备注                                          | 用无效 key（DeepSeek 返回 HTTP 401）端到端验证：未命中→loading→错误态「⚠ AI 请求失败，请检查网络连接」，不白屏不崩溃                                                                                                                                                                        |
 
-> **DeepSeek key**：初始 key `sk-…2a87` 已失效（401）；已替换为用户提供的有效 key `sk-…c17b`（写死在 `exam-helper/background.js`，需求 §5.1 Q-6）。deepseek.test.js 8 例 + 全套 60 单测通过。
->
-> **已知次要偏差**：AI 兜底答案的题型标签按“答案字母数”推断（>1 多选 / =1 单选），题库外的多选题若模型只答一个字母会显示为“单选”；题库内题目有真实 type 不受影响。
+> **DeepSeek key**：I1 起改为 popup 本机配置，不再写死在源码。历史 V-6 真实验证留证仍有效。
+
+---
+
+## 5d. 验收结果（I1 / M4）
+
+| 编号 | 所属模块 | 状态    | 留证 | 备注 |
+| ---- | -------- | ------- | ---- | ---- |
+| V-8  | M4 / I1  | ✅ 通过 | `evidence/screenshots/I1-V8-missing-key.png`、`I1-V8-popup.png` | 未配置 key 时选中题库外题目，气泡显示「还没填写 DeepSeek 密钥，点工具栏图标打开弹窗即可」，不发 DeepSeek 请求。Popup 本机密钥区按确认稿渲染。源码已无明文 key。 |
+| V-1  | M1 回归 | ✅ 通过 | `evidence/screenshots/I1-V1-hit-bubble.png` | 题库命中仍弹出气泡（B C D / 多选 / 题库命中），样式为确认后的浅色毛玻璃稿。 |
+
+> 验收环境：agent-browser `--extension exam-helper` 加载已解压扩展，打开 `evidence/fixture-i1.html`。Popup 截图为 `popup/popup.html` 文件页（布局与扩展弹窗一致；chrome.storage 在真实工具栏弹窗中生效）。
 
 ---
 
@@ -87,3 +97,5 @@ evidence/screenshots/M<N>-V<M>-<description>.png
 | v1   | 2026-07-22 20:58    | 初始版本：M1 验收用例与结果（V-1~V-4）                                 | M1       |
 | v2   | 2026-07-22 (恢复后) | 补 M2 验收用例与结果（V-5，全量题库 77 题真实浏览器验收通过）          | M2       |
 | v3   | 2026-07-22 (恢复后) | 补 M3 验收用例与结果（V-6/V-7 DeepSeek 兜底）；记录线上 key 失效待替换 | M3       |
+| v4   | 2026-08-27 17:27    | 增 V-8 用例；测试命令改为 —；密钥改 popup 本机配置                   | I1、V-8  |
+| v5   | 2026-08-27 18:21    | I1 真实验收：V-8 未配置引导通过；V-1 浅色气泡回归通过               | I1、V-8  |
