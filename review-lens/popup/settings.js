@@ -16,8 +16,14 @@ const say = (text) => {
   status.textContent = text;
 };
 
-// https 是常态，前缀不承载信息就去掉；http 留着，同一主机的两条才区分得开，也看得出不加密
-const displayName = (origin) => origin.replace(/^https:\/\//, "");
+const displayName = (origin) => {
+  try {
+    const { host, protocol } = new URL(origin);
+    return protocol === "http:" ? `${host}（http）` : host;
+  } catch {
+    return origin;
+  }
+};
 
 let settings = null;
 
