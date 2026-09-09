@@ -28,14 +28,18 @@ export function relatedLines(request) {
 
       return {
         line,
-        hits: hits.length,
+        hitCount: hits.length,
         reason:
           line === anchorLine
             ? `评论锚定的行${hits.length ? `，也出现了 ${hits.join("、")}` : ""}`
             : `评论里的 ${hits.join("、")} 在此处出现`,
       };
     })
-    .sort((a, b) => b.hits - a.hits || a.line - b.line);
+    .sort((a, b) => b.hitCount - a.hitCount || a.line - b.line)
+    .map((candidate) => {
+      const { line, reason } = candidate;
+      return { line, reason };
+    });
 
   // 只有锚点一个候选时不值得弹一个列表出来
   return candidates.length > 1 ? candidates : [];

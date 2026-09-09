@@ -7,8 +7,8 @@
 const HOST_TAG = "review-lens-drawer";
 
 // 宽度交给用户拖，上下限防止拖到过窄或盖满整页
-const MIN_WIDTH = 420;
-const MAX_WIDTH = 1400;
+const MIN_WIDTH_PX = 420;
+const MAX_WIDTH_PX = 1400;
 
 /** onDismiss 是「用户想关掉它」，真正的清理由 close() 做，两者不互相调用 */
 export function createShell(request) {
@@ -78,7 +78,7 @@ export function createShell(request) {
       const trackPointer = (move) => {
         // 往左拖变宽：抽屉贴在右边缘
         const next = width + (startX - move.clientX);
-        current = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, next));
+        current = Math.min(MAX_WIDTH_PX, Math.max(MIN_WIDTH_PX, next));
         panel.style.width = `${current}px`;
         onResize(current);
       };

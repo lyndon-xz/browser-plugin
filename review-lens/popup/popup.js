@@ -1,7 +1,9 @@
+import { asDate } from "../core/date.js";
 import { toMarkdown } from "../core/export.js";
 import { MESSAGE_ACTION, ask } from "../core/platform/messages.js";
 
-import { renderCardList } from "./cards-view.js";
+import { projectLabel, renderCardList } from "./cards.js";
+import { renderEmptyState } from "./empty.js";
 
 const root = document.getElementById("cards");
 const tally = document.getElementById("tally");
@@ -11,7 +13,7 @@ const exportButton = document.getElementById("export");
 let cards = [];
 
 function draw() {
-  const projects = new Set(cards.map((card) => card.source.project));
+  const projects = new Set(cards.map(projectLabel));
   tally.textContent = `${cards.length} 张卡片 · ${projects.size} 个仓库`;
   // 没有卡片时导出按钮按了也只会产出一份空文档，直接不给
   exportButton.hidden = cards.length === 0;
@@ -32,7 +34,7 @@ exportButton.addEventListener("click", () => {
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = `review-lens-${new Date().toISOString().slice(0, 10)}.md`;
+  link.download = `review-lens-${asDate(new Date().toISOString())}.md`;
   link.click();
 
   // 下载还没启动就回收会偶发拿到空文件，让出一轮再撤销
@@ -49,15 +51,10 @@ try {
 } catch (error) {
   tally.textContent = "读不到卡片";
   exportButton.hidden = true;
-
-  const box = document.createElement("div");
-  box.className = "empty";
-  const rail = document.createElement("div");
-  rail.className = "empty-rail";
-  const title = document.createElement("strong");
-  title.textContent = "打不开卡片列表";
-  const detail = document.createElement("p");
-  detail.textContent = `${error.message}。关掉这个弹窗再打开一次通常就好了。`;
-  box.append(rail, title, detail);
-  root.replaceChildren(box);
+  root.replaceChildren(
+    renderEmptyState({
+      title: "打不开卡片列表",
+      detail: `${error.message}。关掉这个弹窗再打开一次通常就好了。`,
+    }),
+  );
 }

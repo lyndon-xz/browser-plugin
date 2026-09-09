@@ -1,26 +1,4 @@
-/* 视觉 token 与抽屉同源 */
-:root {
-  --ink: #2f3a52;
-  --ink-soft: #5a6579;
-  --paper: #f4f6fc;
-  --card: #fff;
-  --line: #e4e8f2;
-  --head-bg: #eef1fb;
-  --head-sub: #6b7793;
-  --then: #a8710f;
-  --then-bg: #fef6e3;
-  --now: #147b5c;
-  --now-bg: #e7f7ef;
-  --mark: #4f46e5;
-  /* 主色实底之上的前景色：与 --card 同值但语义不同，跟着 --mark 走而不是跟着卡片走 */
-  --on-mark: #fff;
-  --dim: #8a93a8;
-  --ui:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  --mono:
-    ui-monospace, SFMono-Regular, Menlo, "JetBrains Mono", Consolas, monospace;
-}
+@import url("../ui/tokens.css");
 
 * {
   box-sizing: border-box;
@@ -195,7 +173,7 @@ main {
 }
 
 .mini-btn:hover {
-  border-color: #b9bcf7;
+  border-color: var(--chip-line);
 }
 
 .mini-btn.danger:hover {
@@ -319,7 +297,7 @@ footer {
 .field input:focus {
   outline: none;
   border-color: var(--mark);
-  box-shadow: 0 0 0 3px #eef0ff;
+  box-shadow: 0 0 0 3px var(--mark-bg);
 }
 
 /* 解释退到次要位置：比标签小、比输入框轻 */

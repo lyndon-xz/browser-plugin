@@ -12,7 +12,8 @@ const EXPLANATION = {
   [ERROR_KIND.forbidden]: {
     reason: "无权访问",
     title: "这个仓库你没有读权限",
-    detail: "GitLab 拒绝了这次读取。找项目负责人开权限，或换一个你有权限的 MR。",
+    detail:
+      "GitLab 拒绝了这次读取。找项目负责人开权限，或换一个你有权限的 MR。",
     canUseToken: false,
   },
   [ERROR_KIND.notFound]: {
@@ -25,7 +26,14 @@ const EXPLANATION = {
   [ERROR_KIND.server]: {
     reason: "服务端出错",
     title: "GitLab 这次没返回结果",
-    detail: "服务端报错，通常过一会儿就好。重试一次；持续失败就是实例本身的问题。",
+    detail:
+      "服务端报错，通常过一会儿就好。重试一次；持续失败就是实例本身的问题。",
+    canUseToken: false,
+  },
+  [ERROR_KIND.network]: {
+    reason: "请求没发出去",
+    title: "连不上 GitLab",
+    detail: "网络中断或需要走内网。确认能正常打开 GitLab 页面后重试。",
     canUseToken: false,
   },
   [ERROR_KIND.unexpected]: {
@@ -33,12 +41,6 @@ const EXPLANATION = {
     title: "这次取数没成功，原因不在登录态上",
     detail:
       "可能是请求太频繁被限流，或这个实例的接口与预期不同。稍后重试；一直如此的话把控制台里 [review-lens] 的报错发出来。",
-  },
-  [ERROR_KIND.network]: {
-    reason: "请求没发出去",
-    title: "连不上 GitLab",
-    detail: "网络中断或需要走内网。确认能正常打开 GitLab 页面后重试。",
-    canUseToken: false,
   },
 };
 
@@ -83,14 +85,16 @@ export function renderFailure(request) {
   title.textContent = explanation.title;
 
   const detail = document.createElement("p");
-  detail.textContent = explanation.detail;
+  detail.textContent = error.message ?? explanation.detail;
 
   const actions = document.createElement("div");
   actions.className = "failure-actions";
   actions.append(
     ...[
       actionButton("重试", onRetry),
-      explanation.canUseToken ? actionButton("配置访问令牌", onConfigureToken) : null,
+      explanation.canUseToken
+        ? actionButton("配置访问令牌", onConfigureToken)
+        : null,
     ].filter(Boolean),
   );
 

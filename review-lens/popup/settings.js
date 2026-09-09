@@ -46,7 +46,9 @@ function drawTokenOrigins() {
   }
 
   tokenOrigin.value =
-    kept && [...tokenOrigin.options].some((o) => o.value === kept) ? kept : BUILT_IN_ORIGINS[0];
+    kept && [...tokenOrigin.options].some((o) => o.value === kept)
+      ? kept
+      : BUILT_IN_ORIGINS[0];
   tokenInput.value = settings.tokens?.[tokenOrigin.value] ?? "";
 }
 
@@ -67,15 +69,18 @@ function drawOrigins() {
       try {
         // 先停掉注入与授权，再从列表划掉：只改列表，站点实际仍然生效
         const removed = await ask(MESSAGE_ACTION.unregisterOrigin, { origin });
-        if (!removed.ok) {
+        if (!removed.isOk) {
           remove.disabled = false;
           say(`移除失败：${removed.message}。这个站点仍然生效。`);
           return;
         }
 
+        const tokens = { ...settings.tokens };
+        delete tokens[origin];
         settings = await ask(MESSAGE_ACTION.writeSettings, {
           patch: {
             extraOrigins: settings.extraOrigins.filter((kept) => kept !== origin),
+            tokens,
           },
         });
         drawOrigins();
@@ -101,7 +106,9 @@ document.getElementById("save").addEventListener("click", async () => {
       delete tokens[tokenOrigin.value];
     }
 
-    settings = await ask(MESSAGE_ACTION.writeSettings, { patch: { tokens } });
+    settings = await ask(MESSAGE_ACTION.writeSettings, {
+      patch: { tokens, shouldReenterToken: false },
+    });
     say(`已保存 ${displayName(tokenOrigin.value)} 的设置`);
   } catch (error) {
     say(`保存失败：${error.message}`);
@@ -126,26 +133,29 @@ async function addOrigin() {
     say("站点要形如 https://gitlab.example.com");
     return;
   }
-  if (settings.extraOrigins.includes(origin)) {
+  if (
+    BUILT_IN_ORIGINS.includes(origin) ||
+    settings.extraOrigins.includes(origin)
+  ) {
     say("这个站点已经加过了");
     return;
   }
 
   addButton.disabled = true;
   try {
-    const granted = await requestOriginAccess(chrome, origin);
-    if (!granted) {
+    const isGranted = await requestOriginAccess(chrome, origin);
+    if (!isGranted) {
       say("浏览器未授权该站点");
       return;
     }
 
     const registered = await ask(MESSAGE_ACTION.registerOrigin, { origin });
-    if (!registered.ok) {
+    if (!registered.isOk) {
       // 注册失败要说出来：权限拿到了但脚本没注册，页面上什么都不会出现
       try {
         await chrome.permissions.remove({ origins: [patternFor(origin)] });
-      } catch {
-        // 回收权限失败不改变要告诉用户的结论：脚本没注册上，这个站点不会生效
+      } catch (error) {
+        console.warn("[review-lens] 回收站点权限失败：", error);
       }
       say(`注册失败：${registered.message ?? registered.reason}`);
       return;
@@ -184,7 +194,7 @@ try {
   drawTokenOrigins();
   drawOrigins();
   // 令牌按站点隔离，没有指定站点的旧令牌无法归属，要请用户重填一次
-  if (settings.needsTokenReentry) {
+  if (settings.shouldReenterToken) {
     say("旧版令牌已停用（它没有指定属于哪个站点）。请选择站点后重新填写。");
   }
 } catch (error) {

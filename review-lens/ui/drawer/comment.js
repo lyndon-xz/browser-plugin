@@ -1,7 +1,6 @@
 import { splitAttachments } from "../../core/comment/attachment.js";
 import { extractIdentifiers } from "../../core/comment/identifier.js";
-
-import { asDate } from "./date.js";
+import { asDate } from "../../core/date.js";
 
 /*
  * 评论与回复的渲染。两个导出都是纯函数：不持有状态，正文里的标识符能不能点由
@@ -22,16 +21,42 @@ function renderShot(shot) {
   const image = document.createElement("img");
   image.className = "shot";
   image.src = url;
-  image.alt = alt || "评论里的截图";
+  image.alt = alt ?? "评论里的截图";
   image.loading = "lazy";
 
   link.append(image);
   return link;
 }
 
+function renderAuthorRow(request) {
+  const { author, createdAt, className, badge } = request;
+
+  const top = document.createElement("div");
+  top.className = className;
+
+  const name = document.createElement("span");
+  name.className = "name";
+  name.textContent = author;
+
+  const when = document.createElement("span");
+  when.className = "when";
+  when.textContent = asDate(createdAt);
+
+  top.append(name, when);
+
+  if (badge) {
+    const flag = document.createElement("span");
+    flag.className = "badge";
+    flag.textContent = badge;
+    top.append(flag);
+  }
+
+  return top;
+}
+
 // 只有代码里真出现的标识符才渲染成可点 chip，点了没有目标的链接不做成 chip
-function writeIdentifiers(target, text, context) {
-  const { hitIdentifiers, onJumpTo } = context;
+function writeIdentifiers(target, text, request) {
+  const { hitIdentifiers, onJumpTo } = request;
 
   const linkable = new Set(hitIdentifiers);
   let cursor = 0;
@@ -60,53 +85,44 @@ function writeIdentifiers(target, text, context) {
 }
 
 // 评论与回复共用：文本段做标识符 chip，附件段渲染成截图
-function writeCommentBody(target, text, context) {
-  for (const piece of splitAttachments(text, context.site)) {
+function writeCommentBody(target, text, request) {
+  const { site, hitIdentifiers, onJumpTo } = request;
+
+  for (const piece of splitAttachments(text, site)) {
     if (piece.kind === "image") {
       target.append(renderShot(piece));
     } else {
-      writeIdentifiers(target, piece.text, context);
+      writeIdentifiers(target, piece.text, { hitIdentifiers, onJumpTo });
     }
   }
 }
 
 /** badge 传空则不渲染徽标——「这条评论之后代码有没有动过」由结论区判定 */
 export function renderCommentCard(request) {
-  const { thread, badge, ...context } = request;
+  const { thread, badge, site, hitIdentifiers, onJumpTo } = request;
+  const { author, createdAt, body } = thread;
 
   const card = document.createElement("section");
   card.className = "comment-card";
 
-  const top = document.createElement("div");
-  top.className = "comment-card-top";
+  const bodyEl = document.createElement("p");
+  writeCommentBody(bodyEl, body, { site, hitIdentifiers, onJumpTo });
 
-  const name = document.createElement("span");
-  name.className = "name";
-  name.textContent = thread.author;
-
-  const when = document.createElement("span");
-  when.className = "when";
-  when.textContent = asDate(thread.createdAt);
-
-  top.append(name, when);
-
-  if (badge) {
-    const flag = document.createElement("span");
-    flag.className = "badge";
-    flag.textContent = badge;
-    top.append(flag);
-  }
-
-  const body = document.createElement("p");
-  writeCommentBody(body, thread.body, context);
-
-  card.append(top, body);
+  card.append(
+    renderAuthorRow({
+      author,
+      createdAt,
+      className: "comment-card-top",
+      badge,
+    }),
+    bodyEl,
+  );
   return card;
 }
 
 /** 没人回复时返回 null，让编排层整块不渲染、不留空槽 */
 export function renderReplies(request) {
-  const { replies, ...context } = request;
+  const { replies, site, hitIdentifiers, onJumpTo } = request;
 
   if (!replies?.length) {
     return null;
@@ -125,20 +141,17 @@ export function renderReplies(request) {
     const item = document.createElement("article");
     item.className = "reply";
 
-    const top = document.createElement("div");
-    top.className = "reply-top";
-    const name = document.createElement("span");
-    name.className = "name";
-    name.textContent = reply.author;
-    const when = document.createElement("span");
-    when.className = "when";
-    when.textContent = asDate(reply.createdAt);
-    top.append(name, when);
-
     const body = document.createElement("p");
-    writeCommentBody(body, reply.body, context);
+    writeCommentBody(body, reply.body, { site, hitIdentifiers, onJumpTo });
 
-    item.append(top, body);
+    item.append(
+      renderAuthorRow({
+        author: reply.author,
+        createdAt: reply.createdAt,
+        className: "reply-top",
+      }),
+      body,
+    );
     list.append(item);
   }
   return list;

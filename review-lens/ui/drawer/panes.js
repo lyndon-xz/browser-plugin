@@ -1,4 +1,4 @@
-import { PANE_SIDE, renderCodePane } from "./code-pane.js";
+import { CODE_CLASS, PANE_SIDE, codeLineSelector, renderCodePane } from "./code-pane.js";
 
 /*
  * 代码区：两栏本身、上面那条时间脊（视图切换与同步开关），以及滚动相关的四个动作。
@@ -38,14 +38,14 @@ function renderViewSwitch(request) {
 }
 
 function renderSyncToggle(request) {
-  const { isSyncing, onSyncChange } = request;
+  const { isSyncScrollEnabled, onSyncChange } = request;
 
   const label = document.createElement("label");
   label.className = "sync-toggle";
 
   const box = document.createElement("input");
   box.type = "checkbox";
-  box.checked = isSyncing;
+  box.checked = isSyncScrollEnabled;
   box.addEventListener("change", () => onSyncChange(box.checked));
 
   const text = document.createElement("span");
@@ -57,19 +57,20 @@ function renderSyncToggle(request) {
 
 /** 时间脊：说清在看哪一段，并放视图切换与同步开关 */
 export function renderSpine(request) {
-  const { state, note, view, isSyncing, onViewChange, onSyncChange } = request;
+  const { state, selectionText, view, isSyncScrollEnabled, onViewChange, onSyncChange } =
+    request;
 
   const spine = document.createElement("div");
   spine.className = "spine";
 
   const selectionNote = document.createElement("span");
   selectionNote.className = "spine-note";
-  selectionNote.textContent = note;
+  selectionNote.textContent = selectionText;
   // 视图切换排的是两个块，右边是代码还是结论都一样
   spine.append(selectionNote, renderViewSwitch({ view, onViewChange }));
   // 同步滚动要两个都能滚的代码区才有施力点
   if (hasTwoSides(state)) {
-    spine.append(renderSyncToggle({ isSyncing, onSyncChange }));
+    spine.append(renderSyncToggle({ isSyncScrollEnabled, onSyncChange }));
   }
 
   return spine;
@@ -109,7 +110,7 @@ export function renderPanes(request) {
   return wrap;
 }
 
-const codePanesIn = (root) => [...root.querySelectorAll(".code")];
+const codePanesIn = (root) => [...root.querySelectorAll(`.${CODE_CLASS}`)];
 
 export const readScroll = (root) =>
   codePanesIn(root).map((el) => ({
@@ -124,7 +125,7 @@ export const readScroll = (root) =>
 export function restoreScroll(root, wasAt) {
   codePanesIn(root).forEach((el, index) => {
     const was = wasAt[index];
-    if (!was?.top) {
+    if (was?.top == null) {
       return;
     }
     el.scrollTop = was.height ? (was.top / was.height) * el.scrollHeight : was.top;
@@ -136,7 +137,7 @@ export function restoreScroll(root, wasAt) {
  * CSS 一处，也不会有抽屉关闭后仍在跑的定时器。
  */
 export function flashLine(root, line) {
-  const row = root.querySelector(`.code-line[data-line="${line}"]`);
+  const row = root.querySelector(codeLineSelector(line));
   if (!row) {
     return;
   }
@@ -149,25 +150,30 @@ export function flashLine(root, line) {
 }
 
 /**
- * 两栏滚动同步。isSyncing 传的是取值函数而不是布尔：监听常驻，勾选状态在滚动那一刻才读——
- * 为这个开关重绘会把两侧滚动位置清回开头。echo 标志挡住回弹，否则两侧互相触发。
+ * 两栏滚动同步。readSyncing 是取值函数而不是布尔：监听常驻，勾选状态在滚动那一刻才读——
+ * 为这个开关重绘会把两侧滚动位置清回开头。isEchoing 挡住回弹，否则两侧互相触发。
  */
-export function linkScroll(panes, isSyncing) {
-  const [a, b] = panes.querySelectorAll(".code");
+export function linkScroll(panes, readSyncing) {
+  const [a, b] = panes.querySelectorAll(`.${CODE_CLASS}`);
   if (!a || !b) {
     return;
   }
 
-  let echo = false;
+  let isEchoing = false;
+  const scrollRatio = (el) => {
+    const range = el.scrollHeight - el.clientHeight;
+    return range > 0 ? el.scrollTop / range : 0;
+  };
   const link = (from, to) =>
     from.addEventListener("scroll", () => {
-      if (!isSyncing() || echo) {
+      if (!readSyncing() || isEchoing) {
         return;
       }
-      echo = true;
-      to.scrollTop = from.scrollTop;
+      isEchoing = true;
+      const range = to.scrollHeight - to.clientHeight;
+      to.scrollTop = scrollRatio(from) * range;
       requestAnimationFrame(() => {
-        echo = false;
+        isEchoing = false;
       });
     });
 

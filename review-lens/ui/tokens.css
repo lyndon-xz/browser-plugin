@@ -1,0 +1,28 @@
+/* 抽屉与弹窗共用的视觉 token */
+:root,
+:host {
+  --ink: #2f3a52;
+  --ink-soft: #5a6579;
+  --paper: #f4f6fc;
+  --card: #fff;
+  --line: #e4e8f2;
+  --head-bg: #eef1fb;
+  --head-fg: var(--ink);
+  --head-sub: #6b7793;
+  --then: #a8710f;
+  --then-bg: #fef6e3;
+  --now: #147b5c;
+  --now-bg: #e7f7ef;
+  --mark: #4f46e5;
+  --mark-bg: #eef0ff;
+  --dim: #8a93a8;
+  --chip-line: #b9bcf7;
+  --chip-bg: #e0e2ff;
+  --on-mark: #fff;
+  --radius: 10px;
+  --ui:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --mono:
+    ui-monospace, SFMono-Regular, Menlo, "JetBrains Mono", Consolas, monospace;
+}

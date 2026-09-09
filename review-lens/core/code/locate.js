@@ -1,40 +1,74 @@
-import { findMethodRange } from "./snapshot.js";
+import {
+  findMethodRange,
+  isMethodSignature,
+  methodNameAt,
+} from "./snapshot.js";
 
 /*
  * 把评论时版本的锚点行映射到当前版本的对应位置。不能沿用旧行号：文件改过之后行号会漂移，
- * 同一个行号可能已落到别的方法里。靠方法名定位而不是锚点行文本或整行签名——锚点行往往正是
- * 被改掉的那一行，而整行签名换个参数类型就匹配不上。定位不到返回 null，由调用方告知
- * 「找不到对应位置」，不退回同行号展示一段无关代码。
+ * 同一个行号可能已落到别的方法里。首选方法名映射；方法改名、签名换行或格式化导致匹配失败时，
+ * 再回退到锚点行全文匹配——评论行往往足够独特，且比「代码已删除」更符合读者预期。
  */
 
-// 方法名 = 签名里紧挨左括号的那个标识符
-const nameOf = (signature) =>
-  signature.match(/([A-Za-z_$][\w$]*)\s*\(/)?.[1] ?? null;
+// 过短的行（大括号、return 等）全文匹配误报太多
+const MIN_LINE_TEXT_LEN = 6;
 
 function methodStartsNamed(lines, name) {
   const starts = [];
   lines.forEach((line, index) => {
-    // 必须是方法起始行，否则同名的调用点也会被算进来
-    if (nameOf(line) !== name) {
+    const lineNo = index + 1;
+    if (!isMethodSignature(line)) {
       return;
     }
-    const range = findMethodRange(lines, index + 1);
-    if (range?.start === index + 1) {
-      starts.push(range.start);
+    if (methodNameAt(lines, lineNo) !== name) {
+      return;
+    }
+    const range = findMethodRange(lines, lineNo);
+    if (range?.start === lineNo) {
+      starts.push(lineNo);
     }
   });
   return starts;
 }
 
-export function locateInNewVersion(request) {
-  const { oldLines, newLines, anchorLine } = request;
+function locateByLineText(oldLines, newLines, anchorLine) {
+  const raw = oldLines[anchorLine - 1];
+  if (raw == null) {
+    return null;
+  }
 
+  const needle = raw.trim();
+  if (needle.length < MIN_LINE_TEXT_LEN) {
+    return null;
+  }
+
+  const hits = [];
+  for (let index = 0; index < newLines.length; index += 1) {
+    if (newLines[index].trim() === needle) {
+      hits.push(index + 1);
+    }
+  }
+
+  if (!hits.length) {
+    return null;
+  }
+
+  // 同名行多处出现时，取行号最接近评论时位置的那一处
+  const anchorLineInNew = hits.reduce((best, line) =>
+    Math.abs(line - anchorLine) < Math.abs(best - anchorLine) ? line : best,
+  );
+
+  return { anchorLine: anchorLineInNew };
+}
+
+function locateByMethodName(oldLines, newLines, anchorLine) {
   const oldRange = findMethodRange(oldLines, anchorLine);
   if (!oldRange) {
     return null;
   }
 
-  const name = nameOf(oldLines[oldRange.start - 1]);
+  const { start } = oldRange;
+  const name = methodNameAt(oldLines, start);
   if (!name) {
     return null;
   }
@@ -46,15 +80,22 @@ export function locateInNewVersion(request) {
 
   // 同名方法可能出现多次（重载、复制粘贴），取行号最接近旧位置的那处
   const newStart = candidates.reduce((best, line) =>
-    Math.abs(line - oldRange.start) < Math.abs(best - oldRange.start)
-      ? line
-      : best,
+    Math.abs(line - start) < Math.abs(best - start) ? line : best,
   );
 
   const newRange = findMethodRange(newLines, newStart);
-  const offset = anchorLine - oldRange.start;
+  const offset = anchorLine - start;
   // 新方法可能更短，落到方法体之外就贴到末行
   const end = newRange?.end ?? newLines.length;
 
   return { anchorLine: Math.min(newStart + offset, end) };
+}
+
+export function locateInNewVersion(request) {
+  const { oldLines, newLines, anchorLine } = request;
+
+  return (
+    locateByMethodName(oldLines, newLines, anchorLine) ??
+    locateByLineText(oldLines, newLines, anchorLine)
+  );
 }

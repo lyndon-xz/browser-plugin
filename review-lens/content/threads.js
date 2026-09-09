@@ -1,4 +1,4 @@
-import { loadMergeRequest, loadThreads } from "../core/gitlab/thread.js";
+import { loadThreads } from "../core/gitlab/thread.js";
 
 /**
  * 这条 MR 的评审数据：讨论按 discussionId 索引，外加对照要用的两个基准（当前 head、源分支）。
@@ -9,27 +9,37 @@ export function createThreads(request) {
 
   let byDiscussion = new Map();
   let mergeRequest = null;
-  let error = null;
+  let threadsError = null;
+  let discussionsTruncated = false;
 
   return {
     // 重试要真的重来一次：不清掉上一次的结果与错误，「重试」按钮点几次都撞在同一份错误上
     async reload() {
-      error = null;
+      threadsError = null;
       byDiscussion = new Map();
+      mergeRequest = null;
+      discussionsTruncated = false;
       try {
-        // client 按 path 缓存，与 loadThreads 内部那次取 MR 合起来只发一轮请求
-        mergeRequest = await loadMergeRequest(client, ref);
-        const threads = await loadThreads(client, ref);
+        client.invalidate(
+          `/projects/${ref.project}/merge_requests/${ref.mrIid}`,
+        );
+        const loaded = await loadThreads(client, ref);
+        mergeRequest = loaded.mergeRequest;
+        discussionsTruncated = loaded.discussionsTruncated;
         byDiscussion = new Map(
-          threads.map((thread) => [thread.discussionId, thread]),
+          loaded.threads.map((thread) => [thread.discussionId, thread]),
         );
       } catch (loadError) {
-        error = loadError;
+        threadsError = loadError;
       }
     },
 
-    get error() {
-      return error;
+    get threadsError() {
+      return threadsError;
+    },
+
+    get discussionsTruncated() {
+      return discussionsTruncated;
     },
 
     get discussionIds() {

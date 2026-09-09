@@ -1,8 +1,10 @@
+import { discussionsTruncatedMessage } from "../core/compare-copy.js";
 import { buildComparePair } from "../core/compare.js";
-import { createGitLabClient } from "../core/gitlab/client.js";
+import { ERROR_KIND, createGitLabClient } from "../core/gitlab/client.js";
 import { parseMergeRequestRef } from "../core/gitlab/page.js";
+import { MAX_LOADED_DISCUSSIONS } from "../core/gitlab/thread.js";
 import { MESSAGE_ACTION, ask } from "../core/platform/messages.js";
-import { DRAWER_STATUS } from "../ui/drawer.js";
+import { DRAWER_STATUS } from "../ui/drawer/status.js";
 
 import { createDrawerBridge } from "./drawer-bridge.js";
 import { attachEntries } from "./entries.js";
@@ -15,18 +17,28 @@ import { createThreads } from "./threads.js";
  */
 
 const readCss = async () => {
-  const response = await fetch(chrome.runtime.getURL("ui/drawer.css"));
-  return response.text();
+  const [tokensResponse, drawerResponse] = await Promise.all([
+    fetch(chrome.runtime.getURL("ui/tokens.css")),
+    fetch(chrome.runtime.getURL("ui/drawer.css")),
+  ]);
+  if (!tokensResponse.ok || !drawerResponse.ok) {
+    throw new Error("抽屉样式加载失败");
+  }
+  const [tokensText, drawerText] = await Promise.all([
+    tokensResponse.text(),
+    drawerResponse.text(),
+  ]);
+  return `${tokensText}\n${drawerText}`;
 };
 
 export async function init(overrides = {}) {
   const {
+    isMountCurrent = () => true,
     origin = window.location.origin,
     location = window.location,
     root = document.body,
     fetchImpl = (...args) => window.fetch(...args),
     loadStyleText = readCss,
-    // 令牌只在宿主页登录态被拒时才用得上，且只取当前站点的那一个
     readToken = async () =>
       (await ask(MESSAGE_ACTION.readSettings)).tokens?.[origin] ?? null,
     readSettings = () => ask(MESSAGE_ACTION.readSettings),
@@ -46,9 +58,11 @@ export async function init(overrides = {}) {
   const client = createGitLabClient({ origin, fetch: fetchImpl, readToken });
   const threads = createThreads({ client, ref });
 
+  let isActive = true;
   let openedDiscussionId = null;
 
-  // open 自己会把失败渲染成失败态，这里只负责不把 Promise 漏出去
+  const alive = () => isActive && isMountCurrent();
+
   const reopen = (options) =>
     runDetached("重新取数失败", () =>
       open({ discussionId: openedDiscussionId, ...options }),
@@ -61,11 +75,10 @@ export async function init(overrides = {}) {
     readSettings,
     writeSettings,
     saveCard,
-    // 展开/折叠要重新取数：片段与完整方法体是同一文件的不同截取，只差上下多看多少行
     onWiden: (extraLines) => reopen({ extraLines }),
+    isAlive: alive,
   });
 
-  // 这条评论存过卡没有：查不到不影响对照本身，按没存过渲染
   async function savedCardIdFor(discussionId) {
     try {
       const saved = await findCard({
@@ -81,15 +94,18 @@ export async function init(overrides = {}) {
   }
 
   function renderLoadFailure(discussionId) {
+    if (!alive()) {
+      return;
+    }
     drawer.render({
       status: DRAWER_STATUS.failed,
-      error: threads.error,
-      // 入口在取讨论失败时是全量挂的，重取成功后已有的入口照样能用，不必重挂
-      onRetry: async () => {
-        await threads.reload();
-        await open({ discussionId });
-      },
-      onConfigureToken: openSettings,
+      error: threads.threadsError,
+      onRetry: () =>
+        runDetached("重新取数失败", async () => {
+          await threads.reload();
+          await open({ discussionId });
+        }),
+      onConfigureToken: () => runDetached("打不开设置页", openSettings),
     });
   }
 
@@ -98,14 +114,38 @@ export async function init(overrides = {}) {
 
     openedDiscussionId = discussionId;
     await drawer.ensure();
+    if (!alive()) {
+      return;
+    }
 
-    if (threads.error) {
+    // 每次打开前刷新 MR head 与讨论列表，避免长时间停留同页后对照基准过期
+    await threads.reload();
+    if (!alive()) {
+      return;
+    }
+
+    if (threads.threadsError) {
       renderLoadFailure(discussionId);
       return;
     }
 
     const thread = threads.threadFor(discussionId);
     if (!thread) {
+      if (!alive()) {
+        return;
+      }
+      drawer.render({
+        status: DRAWER_STATUS.failed,
+        error: {
+          kind: ERROR_KIND.notFound,
+          status: 0,
+          message: threads.discussionsTruncated
+            ? discussionsTruncatedMessage(MAX_LOADED_DISCUSSIONS)
+            : "找不到这条讨论，可能已被删除或尚未加载到",
+        },
+        onRetry: () => reopen({ discussionId }),
+        onConfigureToken: () => runDetached("打不开设置页", openSettings),
+      });
       return;
     }
 
@@ -118,13 +158,12 @@ export async function init(overrides = {}) {
         sourceBranch: threads.sourceBranch,
         extraLines,
       });
-      // 连点两条评论时先发的可能后返回；过期的响应直接丢弃，否则会盖掉当前这条
-      if (openedDiscussionId !== discussionId) {
+      if (!alive() || openedDiscussionId !== discussionId) {
         return;
       }
 
       const savedCardId = await savedCardIdFor(discussionId);
-      if (openedDiscussionId !== discussionId) {
+      if (!alive() || openedDiscussionId !== discussionId) {
         return;
       }
 
@@ -136,7 +175,7 @@ export async function init(overrides = {}) {
         savedCardId,
       });
     } catch (error) {
-      if (openedDiscussionId !== discussionId) {
+      if (!alive() || openedDiscussionId !== discussionId) {
         return;
       }
 
@@ -145,27 +184,44 @@ export async function init(overrides = {}) {
         thread,
         error,
         onRetry: () => reopen({ extraLines }),
-        onConfigureToken: openSettings,
+        onConfigureToken: () => runDetached("打不开设置页", openSettings),
       });
     }
   }
 
   await threads.reload();
+  if (!isMountCurrent()) {
+    return () => {};
+  }
+
+  let codeDiscussionIds = threads.threadsError ? undefined : threads.discussionIds;
+
+  const refreshDiscussions = async () => {
+    await threads.reload();
+    if (!alive()) {
+      return;
+    }
+    codeDiscussionIds = threads.threadsError ? undefined : threads.discussionIds;
+  };
 
   const detach = attachEntries({
     root,
-    // 取讨论失败时不筛选：全量挂入口，让用户点开看到失败原因
-    codeDiscussionIds: threads.error ? undefined : threads.discussionIds,
-    onOpen: open,
+    getCodeDiscussionIds: () => codeDiscussionIds,
+    onDiscussionsMaybeStale: refreshDiscussions,
+    onOpen: (request) => runDetached("打开抽屉失败", () => open(request)),
   });
 
-  // 告诉后台「这一页插件真的挂上了」，工具栏图标才点亮；上报失败不影响已挂好的入口
+  if (!isMountCurrent()) {
+    detach();
+    return () => {};
+  }
+
   runDetached("图标没能点亮", reportActive);
 
   return () => {
+    isActive = false;
     detach();
     drawer.close();
-    // 离开这一页后图标不该还亮着；上报失败不影响卸载本身
     runDetached("图标没能复位", reportInactive);
   };
 }

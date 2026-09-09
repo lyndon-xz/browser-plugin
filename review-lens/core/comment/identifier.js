@@ -8,13 +8,15 @@ const CANDIDATE = /[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\([^()\n]*\))?/g;
 const HAS_DOT_OR_CALL = /[.(]/;
 const TYPE_NAME_PATTERN = /^[A-Z]/;
 
+const isTrivialWord = (candidate) =>
+  !HAS_DOT_OR_CALL.test(candidate) && !TYPE_NAME_PATTERN.test(candidate);
+
 export function extractIdentifiers(body) {
   const seen = new Set();
   const found = [];
 
   for (const [candidate] of String(body ?? "").matchAll(CANDIDATE)) {
-    const isWorthLinking = HAS_DOT_OR_CALL.test(candidate) || TYPE_NAME_PATTERN.test(candidate);
-    if (!isWorthLinking || seen.has(candidate)) {
+    if (isTrivialWord(candidate) || seen.has(candidate)) {
       continue;
     }
 

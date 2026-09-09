@@ -6,7 +6,7 @@
 
 const IMAGE = /!\[([^\]]*)\]\(([^)\s]+)\)/g;
 
-const UPLOAD_PATH = /^\/uploads\//;
+const UPLOAD_PATH = /(?:^|\/)uploads\//;
 
 function resolveAttachment(url, site) {
   if (!site?.origin || !site.projectPath) {
@@ -14,12 +14,19 @@ function resolveAttachment(url, site) {
   }
 
   // GitLab 在 note body 里写的是项目相对路径，可取的地址在项目路径下
-  if (UPLOAD_PATH.test(url)) {
+  if (url.startsWith("/uploads/")) {
     return `${site.origin}/${site.projectPath}${url}`;
   }
 
-  const prefix = `${site.origin}/`;
-  return url.startsWith(prefix) ? url : null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.origin !== site.origin || !UPLOAD_PATH.test(parsed.pathname)) {
+      return null;
+    }
+    return parsed.href;
+  } catch {
+    return null;
+  }
 }
 
 export function splitAttachments(body, site) {

@@ -4,44 +4,15 @@ const CONTEXT_LINES = 6;
 /*
  * 展示范围以锚点所在方法为底，再按 extraLines 上下各扩若干行。不做「片段 / 整段」二态切换：
  * 窗口大小与方法边界正交，二态开关会出现「展开全部反而更少」——9 行的方法比锚点 ±6 更窄。
+ * 长方法的展示窗口可以收缩；三态与着色另走 sliceForDiff，始终用完整方法体。
  */
 const WHOLE_METHOD_LIMIT = 60;
 
-export function sliceForReading(lines, anchorLine, options = {}) {
-  const { extraLines = 0, sha, path } = options;
+// 方法名 = 签名里紧挨左括号的那个标识符。定位与切片共用这一份。
+const METHOD_NAME = /([A-Za-z_$][\w$]*)\s*\(/;
 
-  // 旧行号在 force push 或文件被截短后会越界，硬算下去会产出 rangeStart > rangeEnd 的空区间
-  if (!(anchorLine >= 1 && anchorLine <= lines.length)) {
-    return null;
-  }
-
-  const range = findMethodRange(lines, anchorLine);
-  const isWithinWholeMethodLimit = range && range.end - range.start + 1 <= WHOLE_METHOD_LIMIT;
-
-  // 方法找不到或太长时，底盘退回锚点附近的窗口
-  const base = isWithinWholeMethodLimit
-    ? range
-    : { start: anchorLine - CONTEXT_LINES, end: anchorLine + CONTEXT_LINES };
-  const start = Math.max(1, base.start - extraLines);
-  const end = Math.min(lines.length, base.end + extraLines);
-
-  return {
-    sha,
-    path,
-    isWholeMethod: Boolean(isWithinWholeMethodLimit),
-    methodName: isWithinWholeMethodLimit ? methodNameAt(lines, range.start) : null,
-    anchorLine,
-    rangeStart: start,
-    rangeEnd: end,
-    lines: lines.slice(start - 1, end).map((line, index) => ({
-      number: start + index,
-      text: line,
-    })),
-  };
-}
-
-const methodNameAt = (lines, start) =>
-  lines[start - 1].match(/([A-Za-z_$][\w$]*)\s*\(/)?.[1] ?? null;
+const methodNameOf = (signature) =>
+  signature.match(METHOD_NAME)?.[1] ?? null;
 
 /*
  * 数花括号前先去掉字符串、字符字面量与行注释：`log("{ ... }")` 里的花括号不该参与配平。
@@ -73,7 +44,37 @@ const countBraces = (line) => {
  */
 const NOT_A_SIGNATURE =
   /^\s*(?:}\s*)?(?:else\s+)?(?:if|for|while|switch|catch|synchronized|try|do|class|interface|enum|record)\b/;
+// 单行签名：修饰符、参数与左花括号在同一行
 const SIGNATURE = /^\s*[\w<>[\],@.\s]*\([^;]*\)\s*(?:throws[\w\s,.]*)?\{\s*$/;
+// 多行签名：参数换行后，右括号与左花括号落在同一行
+const SIGNATURE_MULTILINE =
+  /^\s*[\w<>[\],@.\s]*\)\s*(?:throws[\w\s,.]*)?\{\s*$/;
+
+export function isMethodSignature(line) {
+  if (NOT_A_SIGNATURE.test(line)) {
+    return false;
+  }
+  return SIGNATURE.test(line) || SIGNATURE_MULTILINE.test(line);
+}
+
+/** 方法名可能在签名第一行，多行签名时要往上找带 `foo(` 的那一行 */
+export function methodNameAt(lines, signatureLine) {
+  for (let line = signatureLine; line >= 1; line -= 1) {
+    const name = methodNameOf(lines[line - 1]);
+    if (name) {
+      return name;
+    }
+    // 往上扫到修饰符行就停，避免误扫进上一个方法体
+    if (
+      /^\s*(?:public|private|protected|static|final|synchronized)\b/.test(
+        lines[line - 1],
+      )
+    ) {
+      break;
+    }
+  }
+  return null;
+}
 
 /**
  * 从锚点行往上找最近的方法签名，再从签名处往下配平花括号找到方法结束。
@@ -82,7 +83,7 @@ const SIGNATURE = /^\s*[\w<>[\],@.\s]*\([^;]*\)\s*(?:throws[\w\s,.]*)?\{\s*$/;
 export function findMethodRange(lines, anchorLine) {
   for (let start = anchorLine; start >= 1; start -= 1) {
     const line = lines[start - 1];
-    if (NOT_A_SIGNATURE.test(line) || !SIGNATURE.test(line)) {
+    if (!isMethodSignature(line)) {
       continue;
     }
 
@@ -100,4 +101,82 @@ export function findMethodRange(lines, anchorLine) {
     }
   }
   return null;
+}
+
+function toSlice(lines, range, extra) {
+  const { start, end } = range;
+  const { extraLines = 0, path, isWholeMethod, methodName, anchorLine } = extra;
+  const rangeStart = Math.max(1, start - extraLines);
+  const rangeEnd = Math.min(lines.length, end + extraLines);
+
+  return {
+    path,
+    isWholeMethod,
+    methodName,
+    anchorLine,
+    rangeStart,
+    rangeEnd,
+    lines: lines.slice(rangeStart - 1, rangeEnd).map((line, index) => ({
+      number: rangeStart + index,
+      text: line,
+    })),
+  };
+}
+
+function methodWindow(lines, anchorLine) {
+  if (!(anchorLine >= 1 && anchorLine <= lines.length)) {
+    return null;
+  }
+
+  const range = findMethodRange(lines, anchorLine);
+  const methodName = range ? methodNameAt(lines, range.start) : null;
+  return { range, methodName, anchorLine };
+}
+
+/**
+ * 三态与着色的基准：完整方法体。找不到方法时退回锚点附近，与展示层同一退路。
+ */
+export function sliceForDiff(lines, anchorLine, options = {}) {
+  const { path } = options;
+  const window = methodWindow(lines, anchorLine);
+  if (!window) {
+    return null;
+  }
+
+  const { range, methodName } = window;
+  const base = range ?? {
+    start: anchorLine - CONTEXT_LINES,
+    end: anchorLine + CONTEXT_LINES,
+  };
+
+  return toSlice(lines, base, {
+    extraLines: 0,
+    path,
+    isWholeMethod: Boolean(range),
+    methodName,
+    anchorLine,
+  });
+}
+
+export function sliceForReading(lines, anchorLine, options = {}) {
+  const { extraLines = 0, path } = options;
+  const window = methodWindow(lines, anchorLine);
+  if (!window) {
+    return null;
+  }
+
+  const { range, methodName } = window;
+  const isWithinWholeMethodLimit =
+    range && range.end - range.start + 1 <= WHOLE_METHOD_LIMIT;
+  const base = isWithinWholeMethodLimit
+    ? range
+    : { start: anchorLine - CONTEXT_LINES, end: anchorLine + CONTEXT_LINES };
+
+  return toSlice(lines, base, {
+    extraLines,
+    path,
+    isWholeMethod: Boolean(isWithinWholeMethodLimit),
+    methodName: isWithinWholeMethodLimit ? methodName : null,
+    anchorLine,
+  });
 }

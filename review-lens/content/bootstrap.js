@@ -24,33 +24,56 @@
   let teardown = null;
   // 同一次路由变化可能连着触发多个事件，用它把并发的挂载收敛成一次
   let mounting = null;
+  // 当前挂载对应的 MR；SPA 在 MR 之间跳转时要先卸再挂，同一条 MR 内则不必重来
+  let mountedKey = null;
+  // init 在 await 期间若路由已变，旧结果不得写回 teardown
+  let mountGeneration = 0;
 
   function unmount() {
+    mountGeneration += 1;
     teardown?.();
     teardown = null;
+    mountedKey = null;
   }
 
   async function sync() {
     try {
       const pageModule = await load("core/gitlab/page.js");
-      const onMergeRequestPage = pageModule.isMergeRequestPage(
+      const isMergeRequestPage = pageModule.isMergeRequestPage(
         document,
         window.location,
       );
 
-      if (!onMergeRequestPage) {
+      if (!isMergeRequestPage) {
         unmount();
         return;
       }
-      // 已经挂着就不重复挂：SPA 内部的局部更新也会走到这里
-      if (teardown) {
+
+      const ref = pageModule.parseMergeRequestRef(window.location);
+      const nextKey = ref ? `${ref.project}/${ref.mrIid}` : null;
+      if (teardown && mountedKey === nextKey) {
         return;
       }
 
+      if (teardown) {
+        unmount();
+      }
+
+      const mountGen = mountGeneration + 1;
+      mountGeneration = mountGen;
+      const isMountCurrent = () => mountGeneration === mountGen;
+
       const entry = await load("content/entry.js");
-      const result = await entry?.init();
+      const result = await entry?.init({ isMountCurrent });
+      if (!isMountCurrent()) {
+        if (typeof result === "function") {
+          result();
+        }
+        return;
+      }
       if (typeof result === "function") {
         teardown = result;
+        mountedKey = nextKey;
       }
     } catch (error) {
       report(error);

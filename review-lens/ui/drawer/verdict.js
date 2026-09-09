@@ -1,6 +1,11 @@
+import {
+  UNLOCATABLE_SHORT,
+  UNLOCATABLE_TITLE,
+  unlocatableDrawerDetail,
+} from "../../core/compare-copy.js";
 import { COMPARE_STATE } from "../../core/compare.js";
-
-import { asDate } from "./date.js";
+import { asDate } from "../../core/date.js";
+import { DRAWER_STATUS } from "./status.js";
 
 /*
  * 结论区：顶栏、徽标、在看哪一段的说明，以及右侧没有代码可给时的那段结论。
@@ -37,7 +42,9 @@ export function renderHead(request) {
 export function describeSelection(state) {
   const { then, diffOps } = state;
 
-  const scope = then.methodName ? `${then.methodName}()` : then.path.split("/").at(-1);
+  const scope = then.methodName
+    ? `${then.methodName}()`
+    : then.path.split("/").at(-1);
   const span = `${then.rangeStart}–${then.rangeEnd} 行`;
   /*
    * 一处修改会同时产生 remove 与 add 两个 op，直接数 op 个数会把「改了 1 行」说成 2 行，
@@ -61,10 +68,13 @@ export function describeSelection(state) {
 const BADGES = {
   [COMPARE_STATE.changed]: "评论后代码已改动",
   [COMPARE_STATE.unchanged]: "至今未改动",
-  [COMPARE_STATE.unlocatable]: "代码已不在当前分支",
+  [COMPARE_STATE.unlocatable]: UNLOCATABLE_SHORT,
 };
 
 export function badgeFor(state) {
+  if (state.status === DRAWER_STATUS.loading) {
+    return null;
+  }
   if (state.state) {
     return BADGES[state.state] ?? null;
   }
@@ -74,7 +84,7 @@ export function badgeFor(state) {
 // 评论之后动过这个文件的提交只列最近几条：给的是线索，不是完整提交历史
 const RECENT_COMMITS = 5;
 
-function renderCommitTrail(commits) {
+function renderCommitTrail(commits, isTruncated = false) {
   const list = document.createElement("ul");
   list.className = "commit-trail";
 
@@ -94,6 +104,14 @@ function renderCommitTrail(commits) {
     item.append(link, who);
     list.append(item);
   }
+
+  if (isTruncated) {
+    const note = document.createElement("li");
+    note.className = "commit-truncated";
+    note.textContent = "提交记录过多，此处仅显示最近的部分";
+    list.append(note);
+  }
+
   return list;
 }
 
@@ -106,14 +124,12 @@ export function renderNoCode(state) {
   const detail = document.createElement("p");
 
   if (state.state === COMPARE_STATE.unlocatable) {
-    title.textContent = "这段代码已经不在当前分支上了";
-    detail.textContent = state.commits?.length
-      ? "方法被改名、挪走或删除了。这里不猜它变成了什么，但可以告诉你评论之后谁动过这个文件："
-      : "方法被改名、挪走或删除了，而且没查到评论之后针对这个文件的提交记录。";
+    title.textContent = UNLOCATABLE_TITLE;
+    detail.textContent = unlocatableDrawerDetail(Boolean(state.commits?.length));
 
     box.append(title, detail);
     if (state.commits?.length) {
-      box.append(renderCommitTrail(state.commits));
+      box.append(renderCommitTrail(state.commits, state.commitsTruncated));
     }
     return box;
   }
@@ -125,7 +141,7 @@ export function renderNoCode(state) {
   detail.textContent =
     "这段代码就是当前分支上的样子，评论提的问题现在仍然成立。" +
     (touched
-      ? `评论之后有 ${touched} 个提交动过这个文件，但没有动到这段代码。`
+      ? `评论之后有 ${touched}${state.commitsTruncated ? "+" : ""} 个提交动过这个文件，但没有动到这段代码。`
       : "评论之后这个文件没有任何提交。");
 
   box.append(title, detail);

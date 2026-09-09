@@ -61,6 +61,14 @@ const KEYWORDS = new Set([
   "null",
 ]);
 
+// 大写开头视作类型名：Java 的命名约定足够可靠，不必解析导入
+const wordKind = (word) => {
+  if (KEYWORDS.has(word)) {
+    return "keyword";
+  }
+  return /^[A-Z]/.test(word) ? "type" : "plain";
+};
+
 // 顺序即优先级：注释先于一切，字符串先于标识符，否则字符串里的 return 会被当关键字
 const RULES = [
   { kind: "comment", pattern: /^\/\/.*/ },
@@ -82,8 +90,15 @@ export function tokenizeJava(line) {
       match: rest.match(rule.pattern),
     })).find((candidate) => candidate.match);
     // 兜底：认不出的字符单独吐出去，保证不丢字符、也不空转
-    const text = hit?.match[0] || rest[0];
-    const kind = hit?.rule.kind ?? "plain";
+    if (!hit) {
+      tokens.push({ kind: "plain", text: rest[0] });
+      rest = rest.slice(1);
+      continue;
+    }
+
+    const { match, rule } = hit;
+    const { kind } = rule;
+    const [text] = match;
 
     tokens.push({
       kind: kind === "word" ? wordKind(text) : kind,
@@ -94,11 +109,3 @@ export function tokenizeJava(line) {
 
   return tokens;
 }
-
-// 大写开头视作类型名：Java 的命名约定足够可靠，不必解析导入
-const wordKind = (word) => {
-  if (KEYWORDS.has(word)) {
-    return "keyword";
-  }
-  return /^[A-Z]/.test(word) ? "type" : "plain";
-};

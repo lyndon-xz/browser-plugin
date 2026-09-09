@@ -14,12 +14,6 @@ export const ERROR_KIND = {
   unexpected: "unexpected",
 };
 
-const KIND_BY_STATUS = {
-  401: ERROR_KIND.unauthenticated,
-  403: ERROR_KIND.forbidden,
-  404: ERROR_KIND.notFound,
-};
-
 export class GitLabRequestError extends Error {
   constructor(kind, status, message) {
     super(message);
@@ -29,9 +23,19 @@ export class GitLabRequestError extends Error {
   }
 }
 
+const KIND_BY_STATUS = {
+  401: ERROR_KIND.unauthenticated,
+  403: ERROR_KIND.forbidden,
+  404: ERROR_KIND.notFound,
+};
+
 // 400、429 既不是登录失效也不是权限不足，兜底成 unauthenticated 会把人引向配令牌这条死路
 const kindOf = (status) =>
   KIND_BY_STATUS[status] ?? (status >= 500 ? ERROR_KIND.server : ERROR_KIND.unexpected);
+
+const isAuthRejection = (status) =>
+  kindOf(status) === ERROR_KIND.unauthenticated ||
+  kindOf(status) === ERROR_KIND.forbidden;
 
 export function createGitLabClient(config) {
   const { origin, fetch, readToken } = config;
@@ -41,10 +45,10 @@ export function createGitLabClient(config) {
   let hasAcceptedToken = false;
 
   async function request(path, options) {
-    const { withToken } = options;
+    const { isUsingToken } = options;
 
     let token = null;
-    if (withToken) {
+    if (isUsingToken) {
       try {
         token = await readToken();
       } catch {
@@ -57,7 +61,7 @@ export function createGitLabClient(config) {
      * 只返回 Response，不返回 null：调用方读 null 的 .ok 会抛裸 TypeError，error.kind 是
      * undefined，界面只能说「未知错误」，说不出重配令牌或重新登录这两条出路。
      */
-    if (withToken && !token) {
+    if (isUsingToken && !token) {
       throw new GitLabRequestError(ERROR_KIND.unauthenticated, 0, "读不到访问令牌");
     }
 
@@ -74,12 +78,12 @@ export function createGitLabClient(config) {
   }
 
   async function fetchOnce(path, read) {
-    let response = await request(path, { withToken: hasAcceptedToken });
+    let response = await request(path, { isUsingToken: hasAcceptedToken });
 
     // 登录态被拒时才动用令牌；403 同样可能是会话身份不足，一并尝试
-    if (!response.ok && (response.status === 401 || response.status === 403) && !hasAcceptedToken) {
+    if (!response.ok && isAuthRejection(response.status) && !hasAcceptedToken) {
       // 令牌读不到时 request 会抛 unauthenticated，那正是该报给用户的原因
-      const retried = await request(path, { withToken: true });
+      const retried = await request(path, { isUsingToken: true });
       if (retried.ok) {
         hasAcceptedToken = true;
       }
@@ -114,9 +118,21 @@ export function createGitLabClient(config) {
     return pending;
   }
 
+  function invalidate(prefix) {
+    for (const key of cache.keys()) {
+      if (
+        key === prefix ||
+        key.startsWith(`${prefix}/`) ||
+        key.startsWith(`${prefix}?`)
+      ) {
+        cache.delete(key);
+      }
+    }
+  }
+
   return {
     get: (path) => cached(path, (response) => response.json()),
     getText: (path) => cached(path, (response) => response.text()),
-    clearCache: () => cache.clear(),
+    invalidate,
   };
 }

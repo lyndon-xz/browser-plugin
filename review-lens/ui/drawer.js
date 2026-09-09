@@ -1,6 +1,9 @@
-import { extractIdentifiers, locateIdentifiers } from "../core/comment/identifier.js";
+import {
+  extractIdentifiers,
+  locateIdentifiers,
+} from "../core/comment/identifier.js";
 
-import { renderCommentCard, renderReplies } from "./drawer/comment-card.js";
+import { renderCommentCard, renderReplies } from "./drawer/comment.js";
 import { renderFailure } from "./drawer/failure.js";
 import { renderFoot } from "./drawer/foot.js";
 import {
@@ -14,16 +17,15 @@ import {
   restoreScroll,
 } from "./drawer/panes.js";
 import { createShell } from "./drawer/shell.js";
-import { badgeFor, describeSelection, renderHead, renderNoCode } from "./drawer/verdict.js";
+import { DRAWER_STATUS } from "./drawer/status.js";
+import {
+  badgeFor,
+  describeSelection,
+  renderHead,
+  renderNoCode,
+} from "./drawer/verdict.js";
 
-const DEFAULT_WIDTH = 820;
-
-/** 抽屉的三种状态。取数方与渲染方共享取值，不各写字面量 */
-export const DRAWER_STATUS = {
-  loading: "loading",
-  ready: "ready",
-  failed: "failed",
-};
+const DEFAULT_DRAWER_WIDTH_PX = 820;
 
 /**
  * 编排层：持有全部可变状态，把每一段该显示什么交给 drawer/ 下的渲染模块。
@@ -50,9 +52,9 @@ export function createDrawer(options) {
 
   // 默认上下堆叠：并排时每栏只剩约 40 字符，Java 行普遍 60–100 字符，几乎每行都要折行
   let view = readView() ?? VIEW.stacked;
-  let width = readWidth() ?? DEFAULT_WIDTH;
+  let width = readWidth() ?? DEFAULT_DRAWER_WIDTH_PX;
   // 默认同步，两侧行数不同会错位，所以留一个开关
-  let syncing = readSyncScroll() ?? true;
+  let isSyncScrollEnabled = readSyncScroll() ?? true;
   /*
    * 笔记与「已存」存在状态里而不是只在 DOM 上：render 会清空重建，
    * 否则切换视图会丢掉用户输入，并让同一条评论存出第二张卡。
@@ -98,12 +100,12 @@ export function createDrawer(options) {
     drawer.append(
       renderSpine({
         state,
-        note: describeSelection(state),
+        selectionText: describeSelection(state),
         view,
-        isSyncing: syncing,
+        isSyncScrollEnabled,
         onViewChange: switchView,
         onSyncChange: (next) => {
-          syncing = next;
+          isSyncScrollEnabled = next;
           writeSyncScroll(next);
         },
       }),
@@ -119,7 +121,7 @@ export function createDrawer(options) {
     drawer.append(panes);
     // 同步是让两侧停在对应的那段代码上，两种布局都成立
     if (hasTwoSides(state)) {
-      linkScroll(panes, () => syncing);
+      linkScroll(panes, () => isSyncScrollEnabled);
     }
 
     drawer.append(
@@ -142,8 +144,10 @@ export function createDrawer(options) {
   }
 
   function render(state) {
+    const { thread, status, then, error, onRetry, onConfigureToken } = state;
+
     // 换了另一条评论：上一条的笔记与「已存」都不属于它
-    if (state.thread?.discussionId !== lastState?.thread?.discussionId) {
+    if (thread?.discussionId !== lastState?.thread?.discussionId) {
       noteText = "";
       savedCardId = null;
     }
@@ -166,8 +170,8 @@ export function createDrawer(options) {
       onCommit: writeWidth,
     });
 
-    drawer.append(renderHead({ thread: state.thread, onClose: close }));
-    if (state.thread) {
+    drawer.append(renderHead({ thread, onClose: close }));
+    if (thread) {
       /*
        * 评论与回复合成一个可滚动区：它们的高度由别人写的内容决定（长正文、几十条回复、
        * 贴一张长截图），不给上限就会把下面的代码对比区整个顶出视口。
@@ -176,7 +180,7 @@ export function createDrawer(options) {
       read.className = "read";
       read.append(
         renderCommentCard({
-          thread: state.thread,
+          thread,
           badge: badgeFor(state),
           site,
           hitIdentifiers,
@@ -184,7 +188,7 @@ export function createDrawer(options) {
         }),
       );
       const replies = renderReplies({
-        replies: state.thread.replies,
+        replies: thread.replies,
         site,
         hitIdentifiers,
         onJumpTo: jumpTo,
@@ -199,17 +203,24 @@ export function createDrawer(options) {
      * 连评论时那一侧都定位不到：没有片段可展示，这一态只给结论，不给代码。
      * 少了这一支，下面的渲染函数会读 state.then 抛错。
      */
-    if (state.status === DRAWER_STATUS.ready && !state.then) {
+    if (status === DRAWER_STATUS.loading) {
+      const loading = document.createElement("section");
+      loading.className = "loading";
+      const text = document.createElement("p");
+      text.textContent = "正在取代码与对比…";
+      loading.append(text);
+      drawer.append(loading);
+    } else if (status === DRAWER_STATUS.ready && !then) {
       drawer.append(renderNoCode(state));
-    } else if (state.status === DRAWER_STATUS.ready) {
+    } else if (status === DRAWER_STATUS.ready) {
       renderReady(drawer, state);
     }
-    if (state.status === DRAWER_STATUS.failed) {
+    if (status === DRAWER_STATUS.failed) {
       drawer.append(
         renderFailure({
-          error: state.error,
-          onRetry: state.onRetry,
-          onConfigureToken: state.onConfigureToken,
+          error,
+          onRetry,
+          onConfigureToken,
         }),
       );
     }

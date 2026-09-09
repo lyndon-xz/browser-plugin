@@ -1,10 +1,11 @@
+import { ERROR_KIND } from "../core/gitlab/client.js";
 import { createDrawer } from "../ui/drawer.js";
+import { DRAWER_STATUS } from "../ui/drawer/status.js";
 
 import { runDetached } from "./run-detached.js";
 
 /**
  * 抽屉与扩展存储之间的一层：懒建实例、把界面偏好接到设置存储、给卡片补上回到原处的链接。
- * 抽屉本身不认识 chrome.*，这些注入口都在这里配好。
  */
 export function createDrawerBridge(request) {
   const {
@@ -15,14 +16,11 @@ export function createDrawerBridge(request) {
     writeSettings,
     saveCard,
     onWiden,
+    isAlive = () => true,
   } = request;
 
   const mrUrl = `${origin}/${ref.projectPath}/-/merge_requests/${ref.mrIid}`;
 
-  /*
-   * 弹窗的「回到 MR」与导出的位置链接都读 source.webUrl；
-   * project 是 encodeURIComponent 后的 API id，展示要用 projectPath。
-   */
   const withLocation = (card) => ({
     ...card,
     source: {
@@ -35,49 +33,88 @@ export function createDrawerBridge(request) {
     },
   });
 
-  // 偏好写不进去就记一笔、下次打开回到旧值，不为它打扰正在读评审的人
   const persist = (patch) =>
     runDetached("这项偏好没能保存", () => writeSettings(patch));
 
   let drawer = null;
   let building = null;
+  let buildError = null;
 
-  /*
-   * 缓存的是「建的过程」而不是「建好的实例」：drawer 赋值在两个 await 之后，
-   * 连点会让两次调用都看到 drawer === null，于是往页面插两个宿主节点。
-   */
   function ensure() {
+    if (buildError) {
+      return Promise.reject(buildError);
+    }
     building ??= (async () => {
-      let settings = {};
       try {
-        settings = await readSettings();
-      } catch {
-        // 读不到界面偏好就用默认值开抽屉，不为一份偏好挡住读评审
-        settings = {};
-      }
+        let settings = {};
+        try {
+          settings = await readSettings();
+        } catch {
+          settings = {};
+        }
 
-      drawer = createDrawer({
-        styleText: await loadStyleText(),
-        // 评论里的截图是项目相对的 /uploads/ 路径，补全成绝对地址才取得到
-        site: { origin, projectPath: ref.projectPath },
-        onWiden,
-        readView: () => settings.view ?? null,
-        writeView: (nextView) => persist({ view: nextView }),
-        readWidth: () => settings.drawerWidth ?? null,
-        writeWidth: (nextWidth) => persist({ drawerWidth: nextWidth }),
-        readSyncScroll: () => settings.syncScroll ?? null,
-        writeSyncScroll: (on) => persist({ syncScroll: on }),
-        onSaveCard: (card) => saveCard(withLocation(card)),
-      });
-      return drawer;
+        if (!isAlive()) {
+          throw new Error("挂载已失效");
+        }
+
+        drawer = createDrawer({
+          styleText: await loadStyleText(),
+          site: { origin, projectPath: ref.projectPath },
+          onWiden,
+          readView: () => settings.view ?? null,
+          writeView: (nextView) => persist({ view: nextView }),
+          readWidth: () => settings.drawerWidthPx ?? null,
+          writeWidth: (nextWidth) => persist({ drawerWidthPx: nextWidth }),
+          readSyncScroll: () => settings.isSyncScroll ?? null,
+          writeSyncScroll: (isEnabled) => persist({ isSyncScroll: isEnabled }),
+          onSaveCard: (card) => saveCard(withLocation(card)),
+        });
+        return drawer;
+      } catch (error) {
+        buildError = error;
+        building = null;
+        throw error;
+      }
     })();
 
     return building;
   }
 
+  function renderBuildFailure(error) {
+    if (!isAlive()) {
+      return;
+    }
+    if (!drawer) {
+      drawer = createDrawer({ styleText: "", site: { origin, projectPath: ref.projectPath } });
+    }
+    drawer.render({
+      status: DRAWER_STATUS.failed,
+      error: {
+        kind: ERROR_KIND.unexpected,
+        status: 0,
+        message: error?.message ?? "抽屉没能打开",
+      },
+    });
+  }
+
   return {
     ensure,
-    render: (state) => drawer.render(state),
+    render: (state) => {
+      if (!isAlive()) {
+        return;
+      }
+      if (drawer) {
+        drawer.render(state);
+        return;
+      }
+      void building
+        ?.then((instance) => {
+          if (isAlive()) {
+            instance.render(state);
+          }
+        })
+        .catch(renderBuildFailure);
+    },
     close: () => drawer?.close(),
   };
 }

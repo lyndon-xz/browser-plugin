@@ -57,16 +57,16 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   const handler = HANDLERS[message?.action];
   // 认不出来的 action 也要回话：return false 会让调用方一直等，最后拿到与真实原因不符的报错
   if (!handler) {
-    respond({ ok: false, error: `未知的 action：${message?.action}` });
+    respond({ isOk: false, error: `未知的 action：${message?.action}` });
     return false;
   }
 
   // 失败要带回给调用方，让界面能说出「存储失败」，而不是静默丢掉
   void (async () => {
     try {
-      respond({ ok: true, result: await handler(message, sender) });
+      respond({ isOk: true, result: await handler(message, sender) });
     } catch (error) {
-      respond({ ok: false, error: error.message });
+      respond({ isOk: false, error: error.message });
     }
   })();
 

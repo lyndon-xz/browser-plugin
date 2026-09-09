@@ -5,14 +5,9 @@
 
 const ENTRY_CLASS = "review-lens-entry";
 
-// 锚点取讨论容器而不是评论节点：主题折叠时容器内没有 note 元素，.discussion-actions 始终存在
 const DISCUSSION_SELECTOR = "[data-discussion-id]";
 const ACTIONS_SELECTOR = ".discussion-actions";
 
-/*
- * 按钮挂在宿主页里、拿不到抽屉那份 Shadow DOM 样式，只能用内联样式；
- * 用内联而不是往宿主页插 <style>，是为了不在宿主页留下痕迹。
- */
 function createEntry(discussionId, onOpen) {
   const button = document.createElement("button");
   button.className = ENTRY_CLASS;
@@ -45,15 +40,40 @@ function createEntry(discussionId, onOpen) {
 }
 
 /**
- * codeDiscussionIds 是 API 认定含代码评论的讨论集合，MR 概览区的普通讨论不会挂上入口；
- * 省略该参数则给所有讨论容器挂上，取讨论失败时用它兜底。返回值是卸载函数。
+ * getCodeDiscussionIds 返回 undefined 时不筛选（取讨论失败时的兜底）；
+ * onDiscussionsMaybeStale 在 DOM 出现未知 discussionId 时触发，便于 reload 后补挂入口。
  */
 export function attachEntries(request) {
-  const { root, codeDiscussionIds, onOpen } = request;
+  const { root, getCodeDiscussionIds, onDiscussionsMaybeStale, onOpen } = request;
+
+  for (const leftover of root.querySelectorAll(`.${ENTRY_CLASS}`)) {
+    leftover.remove();
+  }
+
+  const STALE_RELOAD_MS = 300;
+  let staleReloadTimer = null;
+  let staleReloadChain = Promise.resolve();
+
+  function scheduleStaleReload() {
+    if (!onDiscussionsMaybeStale) {
+      return;
+    }
+    clearTimeout(staleReloadTimer);
+    staleReloadTimer = setTimeout(() => {
+      staleReloadChain = staleReloadChain
+        .then(() => onDiscussionsMaybeStale())
+        .then(() => scan())
+        .catch((error) => {
+          console.warn("[review-lens] 讨论列表刷新失败：", error);
+        });
+    }, STALE_RELOAD_MS);
+  }
 
   function attachTo(box) {
     const { discussionId } = box.dataset;
+    const codeDiscussionIds = getCodeDiscussionIds?.();
     if (codeDiscussionIds && !codeDiscussionIds.has(discussionId)) {
+      scheduleStaleReload();
       return;
     }
     if (box.querySelector(`.${ENTRY_CLASS}`)) {
@@ -62,7 +82,6 @@ export function attachEntries(request) {
 
     const actions = box.querySelector(ACTIONS_SELECTOR);
     const entry = createEntry(discussionId, onOpen);
-    // 放在「显示主题」左边，读者的视线正好落在这里
     if (actions) {
       actions.prepend(entry);
     } else {
@@ -78,16 +97,20 @@ export function attachEntries(request) {
 
   scan();
 
-  // 讨论区异步补渲染，展开/折叠主题时也会新增节点
-  const observer = new MutationObserver(scan);
+  const SCAN_DEBOUNCE_MS = 80;
+  let scanTimer = null;
+  const scheduleScan = () => {
+    clearTimeout(scanTimer);
+    scanTimer = setTimeout(scan, SCAN_DEBOUNCE_MS);
+  };
+
+  const observer = new MutationObserver(scheduleScan);
   observer.observe(root, { childList: true, subtree: true });
 
   return () => {
+    clearTimeout(scanTimer);
+    clearTimeout(staleReloadTimer);
     observer.disconnect();
-    /*
-     * 已挂的按钮也要摘掉：宿主页是客户端路由，节点可能留在文档里，而它们的 click
-     * 指向这一轮的闭包（旧 client、旧讨论数据），下一轮挂载又会在同一处再加一个。
-     */
     for (const entry of root.querySelectorAll(`.${ENTRY_CLASS}`)) {
       entry.remove();
     }

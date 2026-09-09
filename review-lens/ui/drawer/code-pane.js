@@ -8,6 +8,13 @@ import { tokenizeJava } from "../../core/code/highlight.js";
 /** 代码栏的两侧。两端各写字面量时拼错不报错，只是静默不着色 */
 export const PANE_SIDE = { then: "then", now: "now" };
 
+/** panes.js 用这些选择器找代码栏与行 */
+export const CODE_CLASS = "code";
+export const CODE_LINE_CLASS = "code-line";
+
+export const codeLineSelector = (line) =>
+  `.${CODE_LINE_CLASS}[data-line="${line}"]`;
+
 // 每一侧读哪个行号字段、标哪类改动、加哪个 class 都集中在这一处
 const SIDE = {
   [PANE_SIDE.then]: {
@@ -38,6 +45,19 @@ function changedRows(diffOps, side) {
   return changed;
 }
 
+function appendTokens(target, text) {
+  for (const token of tokenizeJava(text)) {
+    if (token.kind === "plain") {
+      target.append(document.createTextNode(token.text));
+      continue;
+    }
+    const span = document.createElement("span");
+    span.className = `t-${token.kind}`;
+    span.textContent = token.text;
+    target.append(span);
+  }
+}
+
 // 一行代码分两层着色：语法着色管「这是什么」，命中底色（.hit）管「评论提到的就是这个」
 function writeSource(target, text, hitIdentifiers) {
   const matched = hitIdentifiers
@@ -63,25 +83,12 @@ function writeSource(target, text, hitIdentifiers) {
   target.append(rest);
 }
 
-function appendTokens(target, text) {
-  for (const token of tokenizeJava(text)) {
-    if (token.kind === "plain") {
-      target.append(document.createTextNode(token.text));
-      continue;
-    }
-    const span = document.createElement("span");
-    span.className = `t-${token.kind}`;
-    span.textContent = token.text;
-    target.append(span);
-  }
-}
-
 function renderLine(line, context) {
   const { number, text } = line;
   const { anchorLine, changedLines, changeType, hitIdentifiers } = context;
 
   const row = document.createElement("div");
-  row.className = "code-line";
+  row.className = CODE_LINE_CLASS;
   row.dataset.line = String(number);
   if (number === anchorLine) {
     row.classList.add("anchor");
@@ -104,6 +111,7 @@ function renderLine(line, context) {
 
 export function renderCodePane(snapshot, options) {
   const { label, side, diffOps, hitIdentifiers = [] } = options;
+  const { rangeStart, rangeEnd, lines, anchorLine } = snapshot;
 
   const pane = document.createElement("section");
   pane.className = `pane ${side}`;
@@ -113,16 +121,16 @@ export function renderCodePane(snapshot, options) {
   const left = document.createElement("span");
   left.textContent = label;
   const right = document.createElement("span");
-  right.textContent = `行 ${snapshot.rangeStart}–${snapshot.rangeEnd}`;
+  right.textContent = `行 ${rangeStart}–${rangeEnd}`;
   head.append(left, right);
 
   const code = document.createElement("div");
-  code.className = "code";
+  code.className = CODE_CLASS;
   const changedLines = changedRows(diffOps, side);
-  for (const line of snapshot.lines) {
+  for (const line of lines) {
     code.append(
       renderLine(line, {
-        anchorLine: snapshot.anchorLine,
+        anchorLine,
         changedLines,
         changeType: SIDE[side].className,
         hitIdentifiers,

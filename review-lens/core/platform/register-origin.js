@@ -12,6 +12,10 @@ export const patternFor = (origin) => `${origin}/*`;
 
 const scriptIdFor = (origin) => `review-lens-${origin}`;
 
+// 与 manifest.json content_scripts[0].js 同源：动态注册必须注入同一份引导脚本
+const contentScriptFiles = (chromeApi) =>
+  chromeApi.runtime.getManifest().content_scripts[0].js;
+
 /** 同步发起：返回的是 chrome 给的那个 promise，调用方 await 它，但不要在它之前 await 别的 */
 export function requestOriginAccess(chrome, origin) {
   if (!ORIGIN_PATTERN.test(String(origin ?? ""))) {
@@ -23,7 +27,7 @@ export function requestOriginAccess(chrome, origin) {
 
 export async function registerOriginScripts(chrome, origin) {
   if (!ORIGIN_PATTERN.test(String(origin ?? ""))) {
-    return { ok: false, reason: "bad-origin" };
+    return { isOk: false, reason: "bad-origin" };
   }
 
   let existing = [];
@@ -34,7 +38,7 @@ export async function registerOriginScripts(chrome, origin) {
     existing = [];
   }
   if (existing.some((script) => script.id === scriptIdFor(origin))) {
-    return { ok: true };
+    return { isOk: true };
   }
 
   try {
@@ -42,14 +46,14 @@ export async function registerOriginScripts(chrome, origin) {
       {
         id: scriptIdFor(origin),
         matches: [patternFor(origin)],
-        js: ["content/bootstrap.js"],
+        js: contentScriptFiles(chrome),
         runAt: "document_idle",
       },
     ]);
-    return { ok: true };
+    return { isOk: true };
   } catch (error) {
     // 除了重复 id，其余（路径写错、超出配额、matches 不合法）都要报出去，否则站点静默不生效
-    return { ok: false, reason: "register-failed", message: error.message };
+    return { isOk: false, reason: "register-failed", message: error.message };
   }
 }
 
@@ -75,5 +79,7 @@ export async function unregisterOrigin(chrome, origin) {
     failures.push(`站点仍被授权（${error.message}）`);
   }
 
-  return failures.length ? { ok: false, message: failures.join("；") } : { ok: true };
+  return failures.length
+    ? { isOk: false, message: failures.join("；") }
+    : { isOk: true };
 }
