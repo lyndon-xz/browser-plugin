@@ -1,8 +1,6 @@
 import { UNLOCATABLE_SHORT } from "../core/compare-copy.js";
 import { COMPARE_STATE } from "../core/compare.js";
 
-import { renderEmptyState } from "./empty.js";
-
 /*
  * 弹窗里的卡片列表。渲染纯粹由传入的 cards 决定，删除交给调用方——
  * 这样它在 jsdom 里可测，不必碰 chrome.*。
@@ -11,6 +9,25 @@ import { renderEmptyState } from "./empty.js";
 const ALL = "__all__";
 
 const EMPTY_HINT = "在 GitLab 的代码评论旁点「解读」，看懂一条就存下来。";
+
+export function renderEmptyState(request) {
+  const { title = "还没有卡片", detail } = request;
+
+  const box = document.createElement("div");
+  box.className = "empty";
+
+  const rail = document.createElement("span");
+  rail.className = "empty-rail";
+
+  const heading = document.createElement("strong");
+  heading.textContent = title;
+
+  const body = document.createElement("p");
+  body.textContent = detail;
+
+  box.append(rail, heading, body);
+  return box;
+}
 const PREVIEW_MAX_CHARS = 240;
 
 function previewText(text) {

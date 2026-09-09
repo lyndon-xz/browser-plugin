@@ -1,3 +1,5 @@
+import { tokensByHost } from "./origins.js";
+
 // chrome.storage.local 之上的一层：卡片与设置。传入 storage 而不是引用 chrome.*，便于替换实现
 
 const CARDS = "cards";
@@ -5,7 +7,7 @@ const SETTINGS = "settings";
 
 const DEFAULT_SETTINGS = {
   /*
-   * 按站点分开存：令牌只该发给它被授予的那个来源，跟着当前页面走会把它发往另一个已注册站点。
+   * 按 hostname 存令牌：同一 GitLab 的 http/https 共用一条，跟着当前页 origin 取对应 host 的令牌。
    * 存 local 不存 sync，免得同步到用户所有机器。
    */
   tokens: {},
@@ -40,7 +42,7 @@ function fromStored(raw) {
   }
 
   return {
-    tokens: next.tokens ?? {},
+    tokens: tokensByHost(next.tokens),
     view: next.view ?? null,
     drawerWidthPx: next.drawerWidthPx ?? next.drawerWidth ?? null,
     isSyncScroll: next.isSyncScroll ?? next.syncScroll ?? null,

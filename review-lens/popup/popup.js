@@ -2,8 +2,7 @@ import { asDate } from "../core/date.js";
 import { toMarkdown } from "../core/export.js";
 import { MESSAGE_ACTION, ask } from "../core/platform/messages.js";
 
-import { projectLabel, renderCardList } from "./cards.js";
-import { renderEmptyState } from "./empty.js";
+import { projectLabel, renderCardList, renderEmptyState } from "./cards.js";
 
 const root = document.getElementById("cards");
 const tally = document.getElementById("tally");

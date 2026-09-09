@@ -3,6 +3,7 @@ import { buildComparePair } from "../core/compare.js";
 import { ERROR_KIND, createGitLabClient } from "../core/gitlab/client.js";
 import { parseMergeRequestRef } from "../core/gitlab/page.js";
 import { MAX_LOADED_DISCUSSIONS } from "../core/gitlab/thread.js";
+import { tokenForPage } from "../core/platform/origins.js";
 import { MESSAGE_ACTION, ask } from "../core/platform/messages.js";
 import { DRAWER_STATUS } from "../ui/drawer/status.js";
 
@@ -40,7 +41,7 @@ export async function init(overrides = {}) {
     fetchImpl = (...args) => window.fetch(...args),
     loadStyleText = readCss,
     readToken = async () =>
-      (await ask(MESSAGE_ACTION.readSettings)).tokens?.[origin] ?? null,
+      tokenForPage((await ask(MESSAGE_ACTION.readSettings)).tokens, origin),
     readSettings = () => ask(MESSAGE_ACTION.readSettings),
     writeSettings = (patch) => ask(MESSAGE_ACTION.writeSettings, { patch }),
     saveCard = (card) => ask(MESSAGE_ACTION.saveCard, { card }),
