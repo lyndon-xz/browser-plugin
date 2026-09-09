@@ -5,10 +5,10 @@ export const PARAM_INDEX_ATTR = "index";
 export function createDragSort(onReorder) {
   let dragIndex = null;
 
-  function startDrag(e) {
-    const { currentTarget, dataTransfer } = e;
-    dragIndex = Number(currentTarget.dataset[PARAM_INDEX_ATTR]);
-    currentTarget.classList.add("dragging");
+  function startDrag(e, item) {
+    const { dataTransfer } = e;
+    dragIndex = Number(item.dataset[PARAM_INDEX_ATTR]);
+    item.classList.add("dragging");
     dataTransfer.effectAllowed = "move";
   }
 
@@ -36,8 +36,8 @@ export function createDragSort(onReorder) {
     onReorder(dragIndex, dropIndex);
   }
 
-  function endDrag(e) {
-    e.currentTarget.classList.remove("dragging");
+  function endDrag(item) {
+    item.classList.remove("dragging");
     dragIndex = null;
     document
       .querySelectorAll(".drag-over")
@@ -46,11 +46,14 @@ export function createDragSort(onReorder) {
 
   return {
     bindItem(item) {
-      item.addEventListener("dragstart", startDrag);
+      const dragHandle = item.querySelector(".drag-handle");
+      item.draggable = false;
+      dragHandle.draggable = true;
+      dragHandle.addEventListener("dragstart", (e) => startDrag(e, item));
       item.addEventListener("dragover", allowDrop);
       item.addEventListener("dragleave", clearDropHint);
       item.addEventListener("drop", reorderParams);
-      item.addEventListener("dragend", endDrag);
+      dragHandle.addEventListener("dragend", () => endDrag(item));
     },
   };
 }

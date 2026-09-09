@@ -17,6 +17,10 @@ import {
   PARAM_VALUE_CLASS,
   startEditValue,
 } from "./edit-value.js";
+import {
+  PARAM_INDEX_CLASS,
+  startMoveToIndex,
+} from "./move-to-index.js";
 
 // 参数项结构：{ key, defaultValue, isNew }
 let params = [];
@@ -46,11 +50,28 @@ function hideState() {
   paramsListEl.classList.remove(HIDDEN_CLASS);
 }
 
-const dragSort = createDragSort((fromIndex, toIndex) => {
+function moveParamToIndex(fromIndex, toIndex) {
+  if (fromIndex === toIndex) {
+    return;
+  }
+  if (toIndex < 0 || toIndex >= params.length) {
+    return;
+  }
   const [moved] = params.splice(fromIndex, 1);
-  const insertAt = fromIndex < toIndex ? toIndex - 1 : toIndex;
-  params.splice(insertAt, 0, moved);
+  params.splice(toIndex, 0, moved);
   renderParams();
+  scrollParamIntoView(toIndex);
+}
+
+function scrollParamIntoView(index) {
+  requestAnimationFrame(() => {
+    paramsListEl.children[index]?.scrollIntoView({ block: "nearest" });
+  });
+}
+
+const dragSort = createDragSort((fromIndex, dropIndex) => {
+  const insertAt = fromIndex < dropIndex ? dropIndex - 1 : dropIndex;
+  moveParamToIndex(fromIndex, insertAt);
 });
 
 function renderParams() {
@@ -72,16 +93,32 @@ function renderParams() {
 
     const item = document.createElement("div");
     item.className = "param-item";
-    item.draggable = true;
     item.dataset[PARAM_INDEX_ATTR] = index;
+
+    const indexLabel = document.createElement("span");
+    indexLabel.className = PARAM_INDEX_CLASS;
+    indexLabel.textContent = String(index + 1);
+    indexLabel.title = "点击输入目标位置";
+    indexLabel.addEventListener("click", () => {
+      startMoveToIndex({
+        item,
+        currentPosition: index + 1,
+        maxPosition: params.length,
+        onCommit: (targetPosition) => {
+          moveParamToIndex(index, targetPosition - 1);
+        },
+      });
+    });
 
     const dragHandle = document.createElement("span");
     dragHandle.className = "drag-handle";
     dragHandle.textContent = "≡";
+    dragHandle.title = "拖动排序";
 
     const key = document.createElement("span");
     key.className = "param-key";
     key.textContent = paramKey;
+    key.title = paramKey;
 
     const value = document.createElement("span");
     if (defaultValue == null) {
@@ -110,6 +147,7 @@ function renderParams() {
       renderParams();
     });
 
+    item.appendChild(indexLabel);
     item.appendChild(dragHandle);
     item.appendChild(key);
     item.appendChild(value);
