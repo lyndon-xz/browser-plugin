@@ -243,68 +243,98 @@ footer {
   border-color: var(--mark);
 }
 
-/* 设置页：去掉白卡片与大圆角，说明降为输入框下方的小字 */
+/* 设置页：options 全页宽，sheet 居中并保证表单控件有足够宽度 */
 .settings {
   display: block;
-  width: auto;
+  width: 100%;
+  min-width: 480px;
   min-height: 100vh;
   max-height: none;
-  padding: 56px 24px;
+  padding: 48px 32px 64px;
 }
 
 .settings-sheet {
-  max-width: 520px;
+  width: min(100%, 540px);
   margin: 0 auto;
 }
 
 .settings h1 {
-  margin: 0 0 6px;
-  font-size: 17px;
+  margin: 0 0 8px;
+  font-size: 20px;
   font-weight: 600;
 }
 
 .settings-lede {
-  margin: 0 0 32px;
-  font-size: 13px;
-  line-height: 1.7;
+  margin: 0 0 36px;
+  font-size: 13.5px;
+  line-height: 1.75;
   color: var(--ink-soft);
 }
 
 .field {
-  padding-top: 20px;
-  margin-bottom: 28px;
+  padding-top: 24px;
+  margin-bottom: 32px;
   border-top: 1px solid var(--line);
 }
 
-.field label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 13px;
+.field-title {
+  margin: 0 0 16px;
+  font-size: 14px;
   font-weight: 600;
 }
 
-.field input {
+.field-group {
+  margin-bottom: 16px;
+}
+
+.field-group:last-of-type {
+  margin-bottom: 0;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.field-control,
+.field input,
+.field select {
+  display: block;
   width: 100%;
-  padding: 8px 11px;
+  min-height: 40px;
+  padding: 10px 12px;
   font-family: var(--mono);
   font-size: 13px;
+  line-height: 1.4;
   color: var(--ink);
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
-.field input:focus {
+.field select {
+  padding-right: 36px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%235a6579' d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.field input:focus,
+.field select:focus {
   outline: none;
   border-color: var(--mark);
   box-shadow: 0 0 0 3px var(--mark-bg);
 }
 
-/* 解释退到次要位置：比标签小、比输入框轻 */
-/* 输入框与按钮同行：授权必须由点击直接触发，所以这里要有个显式按钮 */
 .field-row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
+  align-items: stretch;
 }
 
 .field-row input {
@@ -312,10 +342,16 @@ footer {
   min-width: 0;
 }
 
+.field-row .btn {
+  flex-shrink: 0;
+  align-self: stretch;
+  min-height: 40px;
+}
+
 .field-note {
-  margin: 8px 0 0;
-  font-size: 12px;
-  line-height: 1.7;
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  line-height: 1.8;
   color: var(--dim);
 }
 

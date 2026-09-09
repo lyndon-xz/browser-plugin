@@ -13,10 +13,16 @@
         gitlab.com 上运行。
       </p>
 
-      <div class="field">
-        <label for="token">访问令牌</label>
-        <div class="field-row">
+      <section class="field">
+        <h2 class="field-title">访问令牌</h2>
+
+        <div class="field-group">
+          <label class="field-label" for="token-origin">站点</label>
           <select id="token-origin"></select>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="token">令牌</label>
           <input
             id="token"
             type="password"
@@ -24,27 +30,31 @@
             autocomplete="off"
           />
         </div>
+
         <p class="field-note">
           抽屉提示 401 时才需要——为某个站点填一个只读的 Personal Access
           Token（scope
           <code>read_api</code
           >）。令牌按站点分开存，只发给它所属的那个站点；留空即该站点回到用登录态。只存本机，不同步、不进导出。
         </p>
-      </div>
+      </section>
 
-      <div class="field">
-        <label for="origin">额外的 GitLab 站点</label>
+      <section class="field">
+        <h2 class="field-title">额外的 GitLab 站点</h2>
+
         <div class="field-row">
           <input
             id="origin"
             type="text"
             placeholder="https://gitlab.example.com"
+            aria-label="GitLab 站点地址"
           />
           <button class="btn" id="add-origin" type="button">添加</button>
         </div>
+
         <p class="field-note">回车或点「添加」，浏览器会单独问你要授权。</p>
         <ul class="origins" id="origins"></ul>
-      </div>
+      </section>
 
       <div class="settings-actions">
         <button class="btn primary" id="save">保存</button>
