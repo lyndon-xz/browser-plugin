@@ -17,8 +17,13 @@
         <h2 class="field-title">访问令牌</h2>
 
         <div class="field-group">
-          <label class="field-label" for="token-origin">站点</label>
-          <select id="token-origin"></select>
+          <span class="field-label" id="token-origin-label">站点</span>
+          <div
+            class="host-picker"
+            id="token-origin"
+            role="radiogroup"
+            aria-labelledby="token-origin-label"
+          ></div>
         </div>
 
         <div class="field-group">

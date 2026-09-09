@@ -35,22 +35,42 @@ function tokenHosts() {
   return uniqueHosts([...BUILT_IN_ORIGINS, ...settings.extraOrigins]);
 }
 
+let selectedHost = null;
+
+function getSelectedHost() {
+  const hosts = tokenHosts();
+  if (selectedHost && hosts.includes(selectedHost)) {
+    return selectedHost;
+  }
+  return hosts[0] ?? BUILT_IN_HOSTS[0];
+}
+
+function selectHost(host) {
+  selectedHost = host;
+  for (const option of tokenOrigin.querySelectorAll(".host-option")) {
+    const isSelected = option.dataset.host === host;
+    option.setAttribute("aria-checked", String(isSelected));
+    option.tabIndex = isSelected ? 0 : -1;
+  }
+  tokenInput.value = settings?.tokens?.[host] ?? "";
+}
+
 function drawTokenOrigins() {
-  const kept = tokenOrigin.value;
+  const kept = getSelectedHost();
   tokenOrigin.replaceChildren();
 
   for (const host of tokenHosts()) {
-    const option = document.createElement("option");
-    option.value = host;
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "host-option";
+    option.dataset.host = host;
+    option.setAttribute("role", "radio");
     option.textContent = host;
+    option.addEventListener("click", () => selectHost(host));
     tokenOrigin.append(option);
   }
 
-  tokenOrigin.value =
-    kept && [...tokenOrigin.options].some((option) => option.value === kept)
-      ? kept
-      : BUILT_IN_HOSTS[0];
-  tokenInput.value = settings.tokens?.[tokenOrigin.value] ?? "";
+  selectHost(tokenHosts().includes(kept) ? kept : tokenHosts()[0]);
 }
 
 function drawOrigins() {
@@ -99,7 +119,7 @@ function drawOrigins() {
 document.getElementById("save").addEventListener("click", async () => {
   try {
     const tokens = { ...settings.tokens };
-    const host = tokenOrigin.value;
+    const host = getSelectedHost();
     if (tokenInput.value) {
       tokens[host] = tokenInput.value;
     } else {
@@ -166,10 +186,6 @@ async function addOrigin() {
     addButton.disabled = false;
   }
 }
-
-tokenOrigin.addEventListener("change", () => {
-  tokenInput.value = settings?.tokens?.[tokenOrigin.value] ?? "";
-});
 
 addButton.addEventListener("click", addOrigin);
 originInput.addEventListener("keydown", (event) => {
