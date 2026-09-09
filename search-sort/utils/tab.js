@@ -1,3 +1,6 @@
+import { MESSAGE_ACTION } from "./message.js";
+import { hasSameSearchParams } from "./url.js";
+
 /*
  * 标签页操作相关工具。依赖 chrome.tabs，仅供 background / popup 使用，
  * 不应注入到内容脚本（content script）环境。
@@ -17,27 +20,30 @@ const navigationAttempts = new Map();
 function shouldSkipNavigation(tabId, newURL) {
   const now = Date.now();
 
-  for (const [recordedTabId, attempt] of navigationAttempts) {
-    if (now - attempt.firstAt > NAVIGATION_WINDOW_MS) {
+  for (const [recordedTabId, recordedAttempt] of navigationAttempts) {
+    if (now - recordedAttempt.firstAt > NAVIGATION_WINDOW_MS) {
       navigationAttempts.delete(recordedTabId);
     }
   }
 
   const attempt = navigationAttempts.get(tabId);
-  if (!attempt || attempt.url !== newURL) {
+  if (!attempt) {
     navigationAttempts.set(tabId, { url: newURL, count: 1, firstAt: now });
     return false;
   }
 
-  attempt.count += 1;
+  const { url, count } = attempt;
+  if (url !== newURL) {
+    navigationAttempts.set(tabId, { url: newURL, count: 1, firstAt: now });
+    return false;
+  }
+
+  attempt.count = count + 1;
   return attempt.count > MAX_NAVIGATION_PER_URL;
 }
 
-// 判断两个 URL 是否仅参数顺序不同（参数集合完全相同）
-function isOnlyReorder(oldURL, newURL) {
-  const normalize = (u) =>
-    [...new URL(u).searchParams.entries()].sort().toString();
-  return normalize(oldURL) === normalize(newURL);
+function isStillSourceURL(currentURL, sourceURL) {
+  return currentURL === sourceURL || hasSameSearchParams(currentURL, sourceURL);
 }
 
 /*
@@ -46,15 +52,18 @@ function isOnlyReorder(oldURL, newURL) {
  * - 仅参数顺序变化：通知 content script 原地软更新（replaceState）
  * - 实质变化（注入默认值/增删参数）：整页刷新
  */
-async function applyURLToTab(urlUpdate) {
+export async function applyURLToTab(urlUpdate) {
   const { tabId, oldURL, newURL } = urlUpdate;
-  if (newURL === oldURL) return;
+  if (newURL === oldURL) {
+    return;
+  }
 
-  if (isOnlyReorder(oldURL, newURL)) {
+  if (hasSameSearchParams(oldURL, newURL)) {
     try {
       await chrome.tabs.sendMessage(tabId, {
         action: MESSAGE_ACTION.apply,
         url: newURL,
+        sourceURL: oldURL,
       });
       return;
     } catch (e) {
@@ -68,6 +77,11 @@ async function applyURLToTab(urlUpdate) {
 
   if (shouldSkipNavigation(tabId, newURL)) {
     console.warn("navigation skipped to avoid reload loop:", newURL);
+    return;
+  }
+
+  const tab = await chrome.tabs.get(tabId);
+  if (!tab.url || !isStillSourceURL(tab.url, oldURL)) {
     return;
   }
 

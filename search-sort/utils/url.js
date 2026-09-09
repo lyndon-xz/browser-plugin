@@ -3,14 +3,28 @@
  * - configOnly：以配置为准，剔除配置外的参数（popup 保存时用）
  * - keepExtra：保留配置外的参数，只做排序与默认值注入（自动应用时用）
  */
-const PARAM_MODE = {
+export const PARAM_MODE = {
   configOnly: "config-only",
   keepExtra: "keep-extra",
 };
 
+export function isSupportedURL(url) {
+  return Boolean(url) && url.startsWith("http");
+}
+
+export function emptyDefaultToNull(value) {
+  return value === "" ? null : value;
+}
+
+/** 只比较查询参数多重集，pathname / hash 不在范围内 */
+export function hasSameSearchParams(a, b) {
+  const normalize = (u) =>
+    [...new URL(u).searchParams.entries()].sort().toString();
+  return normalize(a) === normalize(b);
+}
+
 // 按配置顺序重排现有参数，并为配置里给了默认值、URL 上却缺失的参数注入默认值
 function applyParamRules(currentParams, configParams, mode) {
-  const sorted = new URLSearchParams();
   const currentMap = new Map();
 
   for (const [key, value] of currentParams) {
@@ -20,17 +34,20 @@ function applyParamRules(currentParams, configParams, mode) {
     currentMap.get(key).push(value);
   }
 
+  const sorted = new URLSearchParams();
   const addedKeys = new Set();
 
   configParams.forEach((param) => {
-    if (currentMap.has(param.key)) {
-      currentMap.get(param.key).forEach((value) => {
-        sorted.append(param.key, value);
+    const { key, defaultValue } = param;
+
+    if (currentMap.has(key)) {
+      currentMap.get(key).forEach((value) => {
+        sorted.append(key, value);
       });
-      addedKeys.add(param.key);
-    } else if (param.defaultValue != null) {
-      sorted.append(param.key, param.defaultValue);
-      addedKeys.add(param.key);
+      addedKeys.add(key);
+    } else if (defaultValue != null && defaultValue !== "") {
+      sorted.append(key, defaultValue);
+      addedKeys.add(key);
     }
   });
 
@@ -47,7 +64,7 @@ function applyParamRules(currentParams, configParams, mode) {
   return sorted;
 }
 
-function buildURLWithParamRules(url, configParams, mode) {
+export function buildURLWithParamRules(url, configParams, mode) {
   const urlObj = new URL(url);
   urlObj.search = applyParamRules(
     urlObj.searchParams,
@@ -55,4 +72,17 @@ function buildURLWithParamRules(url, configParams, mode) {
     mode,
   ).toString();
   return urlObj.toString();
+}
+
+// 禁用时去掉配置注入的默认值，只保留 URL 上已有的参数
+export function buildURLWithoutConfig(url, configParams) {
+  const urlObj = new URL(url);
+  const existingKeys = new Set(urlObj.searchParams.keys());
+  const kept = configParams
+    .filter((param) => existingKeys.has(param.key))
+    .map((param) => ({
+      key: param.key,
+      defaultValue: urlObj.searchParams.get(param.key),
+    }));
+  return buildURLWithParamRules(url, kept, PARAM_MODE.configOnly);
 }

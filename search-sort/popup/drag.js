@@ -1,10 +1,13 @@
+// popup.js 读写同一份：列表项在参数数组里的序号
+export const PARAM_INDEX_ATTR = "index";
+
 // 参数列表的拖拽排序：只管拖拽交互与索引计算，列表本身由调用方通过 onReorder 改
-function createDragSort(onReorder) {
+export function createDragSort(onReorder) {
   let dragIndex = null;
 
   function startDrag(e) {
     const { currentTarget, dataTransfer } = e;
-    dragIndex = Number(currentTarget.dataset.index);
+    dragIndex = Number(currentTarget.dataset[PARAM_INDEX_ATTR]);
     currentTarget.classList.add("dragging");
     dataTransfer.effectAllowed = "move";
   }
@@ -23,10 +26,12 @@ function createDragSort(onReorder) {
     e.preventDefault();
 
     const { currentTarget } = e;
-    const dropIndex = Number(currentTarget.dataset.index);
+    const dropIndex = Number(currentTarget.dataset[PARAM_INDEX_ATTR]);
     currentTarget.classList.remove("drag-over");
 
-    if (dragIndex === null || dragIndex === dropIndex) return;
+    if (dragIndex === null || dragIndex === dropIndex) {
+      return;
+    }
 
     onReorder(dragIndex, dropIndex);
   }

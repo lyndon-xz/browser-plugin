@@ -3,6 +3,7 @@
   --primary-hover: #3a7bc8;
   --primary-soft: #e8f0fe;
   --primary-faint: #f8fbff;
+  --primary-shadow: rgb(74 144 217 / 15%);
   --success: #4caf50;
   --danger: #e74c3c;
   --text-primary: #1a1a1a;
@@ -118,6 +119,11 @@ body {
   transform: translateX(20px);
 }
 
+.toggle-input:focus-visible + .toggle-slider {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /*
  * Params List
  * 高度不写死：撑到 .popup 的上限为止，之后由 min-height: 0 让它收缩、内部滚动。
@@ -172,7 +178,7 @@ body {
 .param-item.dragging {
   background: var(--primary-soft);
   border-color: var(--primary);
-  box-shadow: 0 4px 12px rgb(74 144 217 / 15%);
+  box-shadow: 0 4px 12px var(--primary-shadow);
   opacity: 0.8;
 }
 

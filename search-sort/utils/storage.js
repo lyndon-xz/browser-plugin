@@ -1,4 +1,4 @@
-// 全部域名配置的落盘根键，值结构为 { [rootDomain]: { enabled, params } }
+// 全部域名配置的落盘根键，值结构为 { [rootDomain]: { isEnabled, params } }
 const CONFIGS_STORAGE_KEY = "configs";
 
 async function readConfigs() {
@@ -6,15 +6,35 @@ async function readConfigs() {
   return result[CONFIGS_STORAGE_KEY] || {};
 }
 
-const StorageHelper = {
+function fromStored(config) {
+  if (!config) {
+    return null;
+  }
+
+  const { enabled, isEnabled, params } = config;
+  return {
+    isEnabled: isEnabled ?? enabled ?? false,
+    params: Array.isArray(params) ? params : [],
+  };
+}
+
+function toStored(config) {
+  return {
+    isEnabled: config.isEnabled,
+    enabled: config.isEnabled,
+    params: config.params,
+  };
+}
+
+export const StorageHelper = {
   async getConfig(rootDomain) {
     const configs = await readConfigs();
-    return configs[rootDomain] || null;
+    return fromStored(configs[rootDomain] || null);
   },
 
   async setConfig(rootDomain, config) {
     const configs = await readConfigs();
-    configs[rootDomain] = config;
+    configs[rootDomain] = toStored(config);
     await chrome.storage.local.set({ [CONFIGS_STORAGE_KEY]: configs });
   },
 };

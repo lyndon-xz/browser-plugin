@@ -1,12 +1,19 @@
-importScripts(
-  "utils/message.js",
-  "utils/domain.js",
-  "utils/url.js",
-  "utils/tab.js",
-  "utils/storage.js",
-);
+import { extractRootDomain } from "./utils/domain.js";
+import { MESSAGE_ACTION } from "./utils/message.js";
+import { StorageHelper } from "./utils/storage.js";
+import { applyURLToTab } from "./utils/tab.js";
+import {
+  PARAM_MODE,
+  buildURLWithParamRules,
+  isSupportedURL,
+} from "./utils/url.js";
 
 const ICON_SIZES = [16, 32, 48, 128];
+
+const ICON_STATE = {
+  active: "active",
+  inactive: "inactive",
+};
 
 function buildIconSet(state) {
   return Object.fromEntries(
@@ -15,42 +22,60 @@ function buildIconSet(state) {
 }
 
 const ICONS = {
-  active: buildIconSet("active"),
-  inactive: buildIconSet("inactive"),
+  [ICON_STATE.active]: buildIconSet(ICON_STATE.active),
+  [ICON_STATE.inactive]: buildIconSet(ICON_STATE.inactive),
 };
 
 function updateIcon(tabId, state) {
   return chrome.action.setIcon({ path: ICONS[state], tabId });
 }
 
-// 只有 http(s) 页面才有可排序的查询参数，chrome://、file:// 等一律跳过
-function isSupportedURL(url) {
-  return Boolean(url) && url.startsWith("http");
-}
-
-async function readConfigForURL(url) {
+function readConfigForURL(url) {
   const rootDomain = extractRootDomain(new URL(url).hostname);
   return StorageHelper.getConfig(rootDomain);
 }
 
+const applyGeneration = new Map();
+
 async function applyConfigToTab(tabId, url) {
-  if (!isSupportedURL(url)) return;
+  if (!isSupportedURL(url)) {
+    return;
+  }
+
+  const generation = (applyGeneration.get(tabId) ?? 0) + 1;
+  applyGeneration.set(tabId, generation);
 
   try {
     const config = await readConfigForURL(url);
 
-    if (!config || !config.enabled) {
-      await updateIcon(tabId, "inactive");
+    if (applyGeneration.get(tabId) !== generation) {
       return;
     }
 
-    const newURL = buildURLWithParamRules(
-      url,
-      config.params,
-      PARAM_MODE.keepExtra,
-    );
+    if (!config) {
+      await updateIcon(tabId, ICON_STATE.inactive);
+      return;
+    }
+
+    const { isEnabled, params } = config;
+    if (!isEnabled) {
+      await updateIcon(tabId, ICON_STATE.inactive);
+      return;
+    }
+
+    const newURL = buildURLWithParamRules(url, params, PARAM_MODE.keepExtra);
+
+    if (applyGeneration.get(tabId) !== generation) {
+      return;
+    }
+
     await applyURLToTab({ tabId, oldURL: url, newURL });
-    await updateIcon(tabId, "active");
+
+    if (applyGeneration.get(tabId) !== generation) {
+      return;
+    }
+
+    await updateIcon(tabId, ICON_STATE.active);
   } catch (e) {
     // URL 不合法或标签页尚未就绪，属预期忽略路径，仅记录便于排查
     console.warn("applyConfigToTab skipped:", e);
@@ -62,11 +87,16 @@ async function applyConfigToTab(tabId, url) {
  * 保存前的旧 URL，会把用户刚剔除的参数加回去
  */
 async function updateIconForTab(tabId, url) {
-  if (!isSupportedURL(url)) return;
+  if (!isSupportedURL(url)) {
+    return;
+  }
 
   try {
     const config = await readConfigForURL(url);
-    await updateIcon(tabId, config?.enabled ? "active" : "inactive");
+    await updateIcon(
+      tabId,
+      config?.isEnabled ? ICON_STATE.active : ICON_STATE.inactive,
+    );
   } catch (e) {
     console.warn("updateIconForTab skipped:", e);
   }
@@ -79,10 +109,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender) => {
-  if (message.action === MESSAGE_ACTION.urlChanged && sender.tab) {
-    void applyConfigToTab(sender.tab.id, message.url);
+  const { action, url, tabId } = message;
+
+  if (action === MESSAGE_ACTION.urlChanged && sender.tab) {
+    void applyConfigToTab(sender.tab.id, url);
   }
-  if (message.action === MESSAGE_ACTION.configUpdated && message.tabId) {
-    void updateIconForTab(message.tabId, message.url);
+  if (action === MESSAGE_ACTION.configUpdated && tabId) {
+    void updateIconForTab(tabId, url);
   }
 });

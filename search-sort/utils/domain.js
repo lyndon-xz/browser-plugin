@@ -44,20 +44,27 @@ const SECOND_LEVEL_TLDS = new Set([
  * 键相互碰撞、配置被套用到无关站点
  */
 function isIpHost(hostname) {
-  if (hostname.includes(":") || hostname.includes("[")) return true;
+  if (hostname.includes(":") || hostname.includes("[")) {
+    return true;
+  }
   const parts = hostname.split(".");
   return parts.length === 4 && parts.every((part) => /^\d+$/.test(part));
 }
 
-function extractRootDomain(hostname) {
+export function extractRootDomain(hostname) {
   const host = hostname.toLowerCase();
-  if (isIpHost(host)) return host;
+  if (isIpHost(host)) {
+    return host;
+  }
 
   const parts = host.split(".");
-  if (parts.length <= 2) return host;
+  const { length } = parts;
+  if (length <= 2) {
+    return host;
+  }
 
   const lastTwo = parts.slice(-2).join(".");
-  if (SECOND_LEVEL_TLDS.has(lastTwo) && parts.length >= 3) {
+  if (SECOND_LEVEL_TLDS.has(lastTwo) && length >= 3) {
     return parts.slice(-3).join(".");
   }
   return lastTwo;
