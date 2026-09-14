@@ -1,38 +1,75 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>exam-helper</title>
     <link rel="stylesheet" href="popup.css" />
-    <title>Exam Helper</title>
   </head>
   <body>
     <div class="wrap">
-      <h1>Exam Helper</h1>
-      <div class="status" id="status">
-        <span class="glow"></span>
-        <span id="status-text">读取中…</span>
-      </div>
-      <p class="hint">选中题目文字，答案会轻轻浮在选区下面。</p>
-      <p class="hint">按 <kbd>Alt</kbd> + <kbd>Q</kbd> 随时开关。</p>
+      <header class="top">
+        <h1>exam-helper</h1>
+        <div class="power" id="status" role="group" aria-label="划词助手">
+          <div class="power-main">
+            <span class="power-dot" aria-hidden="true"></span>
+            <span class="power-label" id="status-text">读取中…</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle" aria-label="启用划词助手" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+      </header>
 
-      <section class="pass" aria-labelledby="pass-title">
-        <div class="pass-title" id="pass-title">本机密钥</div>
-        <p class="pass-sub">只留在这台电脑里，不会写进源码。</p>
-        <div class="pass-well" id="well">
+      <section class="card">
+        <p class="card-title card-title-block">怎么用</p>
+        <ol class="use-steps">
+          <li>打开上方 <strong>开关</strong></li>
+          <li>选中题目文字</li>
+          <li>按下方快捷键查答案，或右键菜单</li>
+        </ol>
+        <div class="shortcut-bar" aria-label="快捷键">
+          <div class="shortcut-pair">
+            <span class="shortcut-name">查答案</span>
+            <span class="shortcut-keys">
+              <kbd>⌃</kbd><kbd>⇧</kbd><kbd>A</kbd>
+            </span>
+          </div>
+          <div class="shortcut-pair">
+            <span class="shortcut-name">开关</span>
+            <span class="shortcut-keys"> <kbd>⌥</kbd><kbd>Q</kbd> </span>
+          </div>
+        </div>
+        <p class="card-desc">
+          划词：📚 答案匹配 或 🤖 AI 推理。L2 练习：题库组卷 / AI
+          组卷（后者需下方密钥）。
+        </p>
+        <div class="btn-pair">
+          <button type="button" id="open-fixture" class="btn">验收页</button>
+          <button type="button" id="open-practice" class="btn">L2 练习</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <span class="card-title">DeepSeek 密钥</span>
+          <span class="card-note">仅存本机</span>
+        </div>
+        <div class="key-row" id="well">
           <input
             id="key"
             type="password"
             autocomplete="off"
             spellcheck="false"
-            placeholder="粘贴 DeepSeek API key"
+            placeholder="sk-…"
           />
-          <button type="button" id="save" disabled>保存</button>
+          <button type="button" id="save" class="btn btn-save" disabled>
+            保存
+          </button>
         </div>
-        <p class="pass-meta" id="meta">还没填 — 题库没有的题暂时没法问 AI</p>
+        <p class="card-meta" id="meta">未配置 — 匹配不到时将无法 AI 推理</p>
       </section>
     </div>
-    <script src="../utils/storage.js"></script>
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>

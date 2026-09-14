@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>exam-helper · 划词验收页</title>
+    <link rel="stylesheet" href="acceptance.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <div id="eh-fixture-status" class="fixture-status is-off" hidden></div>
+      <h1>划词助手验收页</h1>
+      <p class="lead">模拟真实考试页。题库来自《Java 开发手册（黄山版）》。</p>
+
+      <div class="howto">
+        <div class="howto-title">怎么用</div>
+        <ol>
+          <li>popup 里 <strong>启用</strong> 划词助手</li>
+          <li>选中题目文字，点「查答案」或按快捷键</li>
+        </ol>
+      </div>
+
+      <div class="query-bar">
+        <button type="button" class="query-btn" id="eh-query-btn">
+          查答案
+        </button>
+        <span class="query-hint">先选中文字</span>
+      </div>
+
+      <article class="card" id="q1">
+        <h2>题 1 · 答案匹配</h2>
+        <span class="tag multi">多选</span>
+        <p class="stem">
+          1.
+          关于多线程并行处理定时任务的情况，下列哪些说法符合《阿里巴巴Java开发手册》
+        </p>
+        <ul class="options">
+          <li class="option">A. 推荐使用 Timer 方式处理。</li>
+          <li class="option">
+            B. 推荐使用 ScheduledExecutorService 方式处理。
+          </li>
+          <li class="option">
+            C. Timer 运行多个 TimeTask
+            时，只要其中之一没有捕获抛出的异常，其它任务便会自动终止运行。
+          </li>
+          <li class="option">
+            D. ScheduledExecutorService
+            并发运行多个定时任务时，其中某线程抛出异常，不会影响到其它线程的继续运行。
+          </li>
+        </ul>
+        <p class="expect">预期答案：<strong>B C D</strong></p>
+      </article>
+
+      <article class="card" id="q2">
+        <h2>题 2 · AI 兜底</h2>
+        <span class="tag single">单选</span>
+        <span class="tag ai">不在题库</span>
+        <p class="stem">2. Python 装饰器的本质是什么，下列说法正确的是</p>
+        <ul class="options">
+          <li class="option">A. 一种继承机制</li>
+          <li class="option">B. 闭包语法糖，用于包装函数</li>
+          <li class="option">C. Java 接口的别名</li>
+          <li class="option">D. 数据库索引类型</li>
+        </ul>
+        <p class="expect">预期：先「AI 推理中…」，再给出答案（通常 B）</p>
+      </article>
+
+      <article class="card">
+        <h2>对照 · 普通文字</h2>
+        <p class="stem" style="font-weight: 400">
+          这是一段普通说明文字，选中后应提示「未识别为选择题 / 不调用
+          AI」，不应出现答案。
+        </p>
+      </article>
+    </div>
+    <script type="module" src="../content/assist/fixture-bootstrap.js"></script>
+  </body>
+</html>

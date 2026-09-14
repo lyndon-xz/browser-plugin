@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>exam-helper · L2 模拟考</title>
+    <link rel="stylesheet" href="practice.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="top">
+        <div>
+          <h1>阿里巴巴编码规范 L2 练习</h1>
+          <p class="sub" id="mode-sub">模拟考 · 快刷 · 错题本</p>
+          <p class="bank-stats" id="bank-stats"></p>
+          <p class="material-stats" id="material-stats"></p>
+          <p class="coverage-stats" id="coverage-stats" hidden></p>
+        </div>
+        <div class="timer" id="timer" hidden>90:00</div>
+      </header>
+
+      <section class="panel" id="start-panel">
+        <div class="card resume-card" id="resume-card" hidden>
+          <h2>未完成的卷子</h2>
+          <p class="resume-desc" id="resume-desc"></p>
+          <div class="mode-actions">
+            <button type="button" class="btn primary" id="resume-btn">
+              继续答题
+            </button>
+            <button type="button" class="btn" id="discard-btn">
+              放弃并重选
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>选择模式</h2>
+          <div class="source-row" role="radiogroup" aria-label="题目来源">
+            <span class="source-label">题目来源</span>
+            <div class="source-toggle">
+              <button
+                type="button"
+                class="source-opt is-active"
+                data-source="ai"
+                aria-pressed="true"
+              >
+                AI 组卷
+              </button>
+              <button
+                type="button"
+                class="source-opt"
+                data-source="preset"
+                aria-pressed="false"
+              >
+                题库组卷
+              </button>
+            </div>
+          </div>
+          <div class="mode-grid">
+            <button type="button" class="mode-card" data-mode="l2">
+              <span class="mode-name">L2 模拟考</span>
+              <span class="mode-desc">50 题 · 90 分钟 · 80 分及格</span>
+            </button>
+            <button type="button" class="mode-card" data-mode="quick">
+              <span class="mode-name">15 题快刷</span>
+              <span class="mode-desc">27 分钟 · 适合碎片时间</span>
+            </button>
+            <button type="button" class="mode-card" data-mode="wrong">
+              <span class="mode-name">只练错题</span>
+              <span class="mode-desc" id="wrong-count">错题本为空</span>
+            </button>
+          </div>
+          <p class="footnote" id="source-footnote"></p>
+        </div>
+      </section>
+
+      <section class="panel" id="exam-panel" hidden>
+        <div class="exam-progress">
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+          <div class="progress-meta">
+            <span id="progress-text">第 1 / 50 题</span>
+            <span id="answered-text">已答 0 题</span>
+          </div>
+        </div>
+        <div class="meta-bar">
+          <span id="mix-tag" class="mix-tag">—</span>
+          <span id="type-tag" class="type-tag is-multi">多选</span>
+        </div>
+        <div class="card question-card">
+          <h2 class="q-title" id="q-title"></h2>
+          <div class="options" id="options"></div>
+        </div>
+        <div class="nav-row">
+          <button type="button" class="btn" id="prev-btn">上一题</button>
+          <button type="button" class="btn" id="next-btn">下一题</button>
+          <button type="button" class="btn primary" id="submit-btn">
+            交卷
+          </button>
+        </div>
+        <div class="jump-wrap">
+          <div class="jump-label">题号 · 点击跳转</div>
+          <div class="jump-grid" id="jump-grid" aria-label="题号跳转"></div>
+        </div>
+        <p class="key-hint">快捷键：← → 切题 · Enter 下一题 · ⌃⇧A 查答案</p>
+      </section>
+
+      <section class="panel" id="result-panel" hidden>
+        <div class="card result-card">
+          <p class="result-label" id="result-label">考试结果</p>
+          <p class="result-score" id="result-score">0 / 50</p>
+          <p class="result-percent" id="result-percent">0 分</p>
+          <p class="result-hint" id="result-hint"></p>
+          <div class="result-actions">
+            <button type="button" class="btn primary" id="retry-btn">
+              返回选模式
+            </button>
+            <button type="button" class="btn" id="review-btn">只看错题</button>
+            <button type="button" class="btn" id="wrong-btn">去练错题本</button>
+          </div>
+        </div>
+        <div class="card" id="review-wrap" hidden>
+          <h2 class="review-title">错题回顾</h2>
+          <div id="review-list"></div>
+        </div>
+      </section>
+    </div>
+    <script type="module" src="app/entry.js"></script>
+  </body>
+</html>

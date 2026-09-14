@@ -1,0 +1,49 @@
+/* exam-helper 设计 token — popup / practice / acceptance / bubble 共用 */
+:root {
+  /* 文字 */
+  --text-primary: #1a2230;
+  --text-secondary: #5c6573;
+  --text-muted: #5a6270;
+  --text-disabled: #8a929e;
+
+  /* popup / acceptance 别名 */
+  --text: var(--text-primary);
+  --muted: var(--text-secondary);
+  --faint: var(--text-disabled);
+  --ink: var(--text-primary);
+
+  /* 品牌色 */
+  --accent: #2f6f58;
+  --accent-soft: #245545;
+  --accent-dim: #e4f2ec;
+  --accent-bg: #e4f5ee;
+
+  /* 语义色 */
+  --highlight: #ffe58a;
+  --error: #b84a4a;
+  --pass: #245545;
+  --fail: #b84a4a;
+
+  /* 面 */
+  --surface: #ffffff;
+  --surface-muted: #f6f8fb;
+  --surface-input: #eef1f6;
+  --card: #f6f8fb;
+  --page-bg: #f4f7fb;
+  --page: var(--page-bg);
+
+  /* 边框与阴影 */
+  --border: rgba(26, 34, 48, 0.1);
+  --border-strong: rgba(26, 34, 48, 0.18);
+  --line: var(--border);
+  --focus-ring: rgba(47, 111, 88, 0.22);
+  --shadow: rgba(26, 34, 48, 0.14);
+
+  /* 题型标签 */
+  --single: #2f5f86;
+  --single-bg: #d6e8f7;
+  --multi: #8a5520;
+  --multi-bg: #f6e3c8;
+
+  --z-overlay: 2147483647;
+}
