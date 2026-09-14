@@ -253,7 +253,8 @@
   font-size: 13.5px;
 }
 
-.untouched p {
+.untouched p,
+.untouched .commit-fetch-failed {
   max-width: 38ch;
   margin: 0 auto;
   font-size: 12.5px;

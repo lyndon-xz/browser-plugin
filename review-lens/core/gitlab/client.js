@@ -14,6 +14,7 @@ export const ERROR_KIND = {
   unexpected: "unexpected",
 };
 
+/** GitLab API 失败时抛出的带 kind 与 status 的错误 */
 export class GitLabRequestError extends Error {
   constructor(kind, status, message) {
     super(message);
@@ -31,15 +32,18 @@ const KIND_BY_STATUS = {
 
 // 400、429 既不是登录失效也不是权限不足，兜底成 unauthenticated 会把人引向配令牌这条死路
 const kindOf = (status) =>
-  KIND_BY_STATUS[status] ?? (status >= 500 ? ERROR_KIND.server : ERROR_KIND.unexpected);
+  KIND_BY_STATUS[status] ??
+  (status >= 500 ? ERROR_KIND.server : ERROR_KIND.unexpected);
 
 const isAuthRejection = (status) =>
   kindOf(status) === ERROR_KIND.unauthenticated ||
   kindOf(status) === ERROR_KIND.forbidden;
 
+/** 只读 GitLab 客户端：同源 cookie，必要时回退访问令牌 */
 export function createGitLabClient(config) {
   const { origin, fetch, readToken } = config;
 
+  const CACHE_TTL_MS = 5 * 60 * 1000;
   const cache = new Map();
   // 令牌回退一旦成功就记住，省掉之后每次都先撞一次 401
   let hasAcceptedToken = false;
@@ -62,7 +66,11 @@ export function createGitLabClient(config) {
      * undefined，界面只能说「未知错误」，说不出重配令牌或重新登录这两条出路。
      */
     if (isUsingToken && !token) {
-      throw new GitLabRequestError(ERROR_KIND.unauthenticated, 0, "读不到访问令牌");
+      throw new GitLabRequestError(
+        ERROR_KIND.unauthenticated,
+        0,
+        "读不到访问令牌",
+      );
     }
 
     let response;
@@ -102,8 +110,12 @@ export function createGitLabClient(config) {
 
   // 失败不进缓存，否则「重试」按钮点了也只是拿回同一个错误
   function cached(path, read) {
-    if (cache.has(path)) {
-      return cache.get(path);
+    const hit = cache.get(path);
+    if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
+      return hit.promise;
+    }
+    if (hit) {
+      cache.delete(path);
     }
 
     const pending = (async () => {
@@ -114,7 +126,7 @@ export function createGitLabClient(config) {
         throw error;
       }
     })();
-    cache.set(path, pending);
+    cache.set(path, { promise: pending, at: Date.now() });
     return pending;
   }
 

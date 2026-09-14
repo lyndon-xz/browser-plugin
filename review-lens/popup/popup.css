@@ -41,6 +41,27 @@ header .mini-btn {
   margin-left: auto;
 }
 
+.search-wrap {
+  padding: 8px 14px 0;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+
+.search {
+  width: 100%;
+  padding: 7px 10px;
+  font: 13px var(--ui);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.search:focus {
+  outline: 2px solid var(--mark);
+  outline-offset: 1px;
+}
+
 main {
   flex: 1;
   overflow-y: auto;

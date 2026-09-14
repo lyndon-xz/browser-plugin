@@ -8,6 +8,7 @@
 /** 只接受 origin 本身：带路径或缺协议的都会让 match 模式失效 */
 export const ORIGIN_PATTERN = /^https?:\/\/[^/]+$/;
 
+/** 把 origin 转成 content script 的 match 模式 */
 export const patternFor = (origin) => `${origin}/*`;
 
 const scriptIdFor = (origin) => `review-lens-${origin}`;
@@ -25,6 +26,7 @@ export function requestOriginAccess(chrome, origin) {
   return chrome.permissions.request({ origins: [patternFor(origin)] });
 }
 
+/** 在 service worker 里为 origin 注册 content script（须先 requestOriginAccess） */
 export async function registerOriginScripts(chrome, origin) {
   if (!ORIGIN_PATTERN.test(String(origin ?? ""))) {
     return { isOk: false, reason: "bad-origin" };

@@ -97,6 +97,7 @@ function section(card) {
   return lines.join("\n");
 }
 
+/** 把学习卡片导出为可直接贴进笔记的 Markdown */
 export function toMarkdown(cards) {
   const head = [
     "# review-lens 学习卡片",

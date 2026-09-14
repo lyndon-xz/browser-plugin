@@ -1,11 +1,13 @@
 import {
   extractIdentifiers,
   locateIdentifiers,
+  pickJumpLine,
 } from "../core/comment/identifier.js";
 
 import { renderCommentCard, renderReplies } from "./drawer/comment.js";
 import { renderFailure } from "./drawer/failure.js";
 import { renderFoot } from "./drawer/foot.js";
+import { PANE_SIDE } from "./drawer/code-pane.js";
 import {
   VIEW,
   flashLine,
@@ -64,13 +66,59 @@ export function createDrawer(options) {
   let lastState = null;
   // 评论里提到、且代码里真出现了的标识符：chip 与代码内高亮共用同一份，口径只有一处
   let hitIdentifiers = [];
+  let unlinkScroll = null;
+  let pendingFlashLine = null;
 
-  // 跳到该标识符在代码里出现的第一行，并闪一下标出落点
+  function extraLinesNeeded(then, line) {
+    if (!then || line == null) {
+      return 0;
+    }
+    if (line >= then.rangeStart && line <= then.rangeEnd) {
+      return 0;
+    }
+    if (line < then.rangeStart) {
+      return then.rangeStart - line;
+    }
+    return line - then.rangeEnd;
+  }
+
+  // 相关行与 chip 都指向评论时文件；行不在当前片段里时先扩行再闪
+  function ensureLineVisible(line) {
+    if (
+      flashLine(shell.root, line, { side: PANE_SIDE.then }) ||
+      !lastState?.then
+    ) {
+      pendingFlashLine = null;
+      return;
+    }
+
+    const need = extraLinesNeeded(lastState.then, line);
+    if (need > 0 && lastState.thread) {
+      pendingFlashLine = line;
+      onWiden(
+        (lastState.extraLines ?? 0) + need,
+        lastState.thread.discussionId,
+      );
+    }
+  }
+
+  function finishPendingFlash() {
+    if (pendingFlashLine == null) {
+      return;
+    }
+    const line = pendingFlashLine;
+    if (flashLine(shell.root, line, { side: PANE_SIDE.then })) {
+      pendingFlashLine = null;
+    }
+  }
+
+  // 跳到该标识符在代码里出现的那一行，并闪一下标出落点
   function jumpTo(identifier) {
-    const located = locateIdentifiers([identifier], lastState.then.lines)[0];
-    const line = located?.lines[0];
+    const lines = lastState.searchLines ?? lastState.then.lines;
+    const located = locateIdentifiers([identifier], lines)[0];
+    const line = pickJumpLine(located?.lines, lastState.then?.anchorLine);
     if (line) {
-      flashLine(shell.root, line);
+      ensureLineVisible(line);
     }
   }
 
@@ -120,8 +168,13 @@ export function createDrawer(options) {
     });
     drawer.append(panes);
     // 同步是让两侧停在对应的那段代码上，两种布局都成立
-    if (hasTwoSides(state)) {
-      linkScroll(panes, () => isSyncScrollEnabled);
+    unlinkScroll?.();
+    unlinkScroll = hasTwoSides(state)
+      ? linkScroll(panes, () => isSyncScrollEnabled)
+      : null;
+
+    if (state.scrollWasAt?.length) {
+      restoreScroll(shell.root, state.scrollWasAt);
     }
 
     drawer.append(
@@ -132,7 +185,7 @@ export function createDrawer(options) {
         savedCardId,
         onWiden,
         onSaveCard,
-        onFlashLine: (line) => flashLine(shell.root, line),
+        onFlashLine: ensureLineVisible,
         onNoteChange: (value) => {
           noteText = value;
         },
@@ -141,6 +194,8 @@ export function createDrawer(options) {
         },
       }),
     );
+
+    finishPendingFlash();
   }
 
   function render(state) {
@@ -150,6 +205,7 @@ export function createDrawer(options) {
     if (thread?.discussionId !== lastState?.thread?.discussionId) {
       noteText = "";
       savedCardId = null;
+      pendingFlashLine = null;
     }
     lastState = state;
     hitIdentifiers = hitsIn(state);
@@ -157,6 +213,8 @@ export function createDrawer(options) {
     if (!shell.isMounted()) {
       shell.mount();
     }
+    const scrollWasAt =
+      state.isWiden && shell.isMounted() ? readScroll(shell.root) : null;
     shell.clearContent();
 
     const drawer = document.createElement("aside");
@@ -212,8 +270,25 @@ export function createDrawer(options) {
       drawer.append(loading);
     } else if (status === DRAWER_STATUS.ready && !then) {
       drawer.append(renderNoCode(state));
+      drawer.append(
+        renderFoot({
+          state,
+          site,
+          note: noteText,
+          savedCardId,
+          onWiden,
+          onSaveCard,
+          onFlashLine: ensureLineVisible,
+          onNoteChange: (value) => {
+            noteText = value;
+          },
+          onSaved: (id) => {
+            savedCardId = id;
+          },
+        }),
+      );
     } else if (status === DRAWER_STATUS.ready) {
-      renderReady(drawer, state);
+      renderReady(drawer, { ...state, scrollWasAt });
     }
     if (status === DRAWER_STATUS.failed) {
       drawer.append(
@@ -226,9 +301,12 @@ export function createDrawer(options) {
     }
 
     shell.root.append(drawer);
+    shell.focusPanel(drawer);
   }
 
   function close() {
+    unlinkScroll?.();
+    unlinkScroll = null;
     shell.close();
   }
 

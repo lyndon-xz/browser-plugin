@@ -29,6 +29,7 @@ function resolveAttachment(url, site) {
   }
 }
 
+/** 把评论正文拆成文字段与 /uploads/ 附件链接 */
 export function splitAttachments(body, site) {
   const text = String(body ?? "");
   const pieces = [];

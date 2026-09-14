@@ -2,7 +2,7 @@ import { diffLines } from "./code/diff.js";
 import { locateInNewVersion } from "./code/locate.js";
 import { sliceForDiff, sliceForReading } from "./code/snapshot.js";
 import { loadFile } from "./gitlab/file.js";
-import { ANCHOR_SIDE } from "./gitlab/thread.js";
+import { ANCHOR_SIDE, thenAnchorLineFor } from "./gitlab/thread.js";
 
 /**
  * 一条评论的「评论时 ↔ 当前」对照结果，按读者需要区分的结论分三态，不按算法路径分：
@@ -54,10 +54,11 @@ async function fetchAllCommits(client, query) {
 
 const commitsTouchedSince = async (client, query) => {
   try {
-    return await fetchAllCommits(client, query);
+    const result = await fetchAllCommits(client, query);
+    return { ...result, fetchFailed: false };
   } catch {
     // 提交列表是线索，不是对照的前提：取不到就空着，主结论照样给
-    return { commits: [], isTruncated: false };
+    return { commits: [], isTruncated: false, fetchFailed: true };
   }
 };
 
@@ -65,6 +66,92 @@ const commitsTouchedSince = async (client, query) => {
  * diff 基准固定为两侧方法体，与「上下各多看几行」无关：着色是这段代码的客观事实，不随视口变。
  * op 里带的是文件绝对行号，渲染时按行号直接对上，省掉一层偏移换算。
  */
+function buildResliceCache(request) {
+  const {
+    oldLines,
+    newLines,
+    locatedAnchorLine,
+    path,
+    thenAnchorLine,
+    state,
+    commits,
+    commitsTruncated,
+    commitsFetchFailed,
+    diffOps,
+  } = request;
+  if (!oldLines) {
+    return null;
+  }
+  return {
+    oldLines,
+    newLines: newLines ?? null,
+    locatedAnchorLine: locatedAnchorLine ?? null,
+    path,
+    thenAnchorLine,
+    state,
+    commits,
+    commitsTruncated,
+    commitsFetchFailed: commitsFetchFailed ?? false,
+    diffOps,
+  };
+}
+
+/** 扩行时只重切片段，复用已加载的文件内容与对照结论，不再打 API */
+export function resliceComparePair(cache, extraLines = 0) {
+  const {
+    oldLines,
+    newLines,
+    locatedAnchorLine,
+    path,
+    thenAnchorLine,
+    state,
+    commits,
+    commitsTruncated,
+    commitsFetchFailed,
+    diffOps,
+  } = cache;
+
+  const then = sliceForReading(oldLines, thenAnchorLine, { extraLines, path });
+  if (!then) {
+    return {
+      state: COMPARE_STATE.unlocatable,
+      then: null,
+      now: null,
+      commits,
+      commitsTruncated,
+      commitsFetchFailed,
+      diffOps: [],
+    };
+  }
+
+  if (state === COMPARE_STATE.changed && newLines && locatedAnchorLine != null) {
+    const now = sliceForReading(newLines, locatedAnchorLine, { extraLines, path });
+    return { state, then, now, commits, commitsTruncated, commitsFetchFailed, diffOps };
+  }
+
+  if (state === COMPARE_STATE.unchanged) {
+    return {
+      state,
+      then,
+      now: null,
+      commits,
+      commitsTruncated,
+      commitsFetchFailed,
+      diffOps: [],
+    };
+  }
+
+  return {
+    state,
+    then,
+    now: null,
+    commits,
+    commitsTruncated,
+    commitsFetchFailed,
+    diffOps: [],
+  };
+}
+
 function diffOfBase(thenBase, nowBase) {
   const ops = diffLines(
     thenBase.lines.map((line) => line.text),
@@ -79,10 +166,12 @@ function diffOfBase(thenBase, nowBase) {
   }));
 }
 
+/** 构建一条评论的「评论时 ↔ 当前」对照结果 */
 export async function buildComparePair(client, request) {
   const { project, thread, mrHeadSha, sourceBranch, extraLines = 0 } = request;
   const { path, anchorLine, anchorSide, position, isOutdated, createdAt } =
     thread;
+  const thenAnchorLine = thenAnchorLineFor(thread);
 
   // 锚点在旧侧时行号属于 base_sha 那个版本，拿 head_sha 去切同一行号会切到别处
   const anchorSha =
@@ -96,7 +185,7 @@ export async function buildComparePair(client, request) {
     sha: anchorSha,
   });
   const sliceOld = (extra) =>
-    sliceForReading(oldLines, anchorLine, {
+    sliceForReading(oldLines, thenAnchorLine, {
       extraLines: extra,
       path,
     });
@@ -104,37 +193,65 @@ export async function buildComparePair(client, request) {
 
   // 三种结局里有两种要它，参数每次都一样
   const touchedSinceComment = async () => {
-    const { commits, isTruncated } = await commitsTouchedSince(client, {
+    const { commits, isTruncated, fetchFailed } = await commitsTouchedSince(client, {
       project,
       path,
       branch: sourceBranch,
       since: createdAt,
     });
-    return { commits, commitsTruncated: isTruncated };
+    return {
+      commits,
+      commitsTruncated: isTruncated,
+      commitsFetchFailed: fetchFailed,
+    };
   };
 
   // 锚点行已经不在这个版本里，谈不上对照，也没有可展示的片段
   if (!then) {
-    const { commits, commitsTruncated } = await touchedSinceComment();
+    const { commits, commitsTruncated, commitsFetchFailed } =
+      await touchedSinceComment();
     return {
       state: COMPARE_STATE.unlocatable,
       then: null,
       now: null,
       commits,
       commitsTruncated,
+      commitsFetchFailed,
       diffOps: [],
+      resliceCache: buildResliceCache({
+        oldLines,
+        path,
+        thenAnchorLine,
+        state: COMPARE_STATE.unlocatable,
+        commits,
+        commitsTruncated,
+        commitsFetchFailed,
+        diffOps: [],
+      }),
     };
   }
 
   if (!isOutdated) {
-    const { commits, commitsTruncated } = await touchedSinceComment();
+    const { commits, commitsTruncated, commitsFetchFailed } =
+      await touchedSinceComment();
     return {
       state: COMPARE_STATE.unchanged,
       then,
       now: null,
       commits,
       commitsTruncated,
+      commitsFetchFailed,
       diffOps: [],
+      resliceCache: buildResliceCache({
+        oldLines,
+        path,
+        thenAnchorLine,
+        state: COMPARE_STATE.unchanged,
+        commits,
+        commitsTruncated,
+        commitsFetchFailed,
+        diffOps: [],
+      }),
     };
   }
 
@@ -146,11 +263,13 @@ export async function buildComparePair(client, request) {
   const located = locateInNewVersion({
     oldLines,
     newLines,
-    anchorLine,
+    anchorLine: thenAnchorLine,
+    path,
   });
 
   if (!located) {
-    const { commits, commitsTruncated } = await touchedSinceComment();
+    const { commits, commitsTruncated, commitsFetchFailed } =
+      await touchedSinceComment();
     // 找不到位置时给出线索：评论之后谁改过这个文件。全量给出，显示几条是展示层的事
     return {
       state: COMPARE_STATE.unlocatable,
@@ -158,7 +277,18 @@ export async function buildComparePair(client, request) {
       now: null,
       commits,
       commitsTruncated,
+      commitsFetchFailed,
       diffOps: [],
+      resliceCache: buildResliceCache({
+        oldLines,
+        path,
+        thenAnchorLine,
+        state: COMPARE_STATE.unlocatable,
+        commits,
+        commitsTruncated,
+        commitsFetchFailed,
+        diffOps: [],
+      }),
     };
   }
 
@@ -166,16 +296,37 @@ export async function buildComparePair(client, request) {
     extraLines,
     path,
   });
-  const thenDiff = sliceForDiff(oldLines, anchorLine, { path });
+  const thenDiff = sliceForDiff(oldLines, thenAnchorLine, { path });
   const nowDiff = sliceForDiff(newLines, located.anchorLine, { path });
   const diffOps = thenDiff && nowDiff ? diffOfBase(thenDiff, nowDiff) : [];
 
   // 「改没改」只在这里判一次，界面直接读结论，徽标、着色与「N 行有改动」不会各说一套
   if (diffOps.some((op) => op.type !== "keep")) {
-    return { state: COMPARE_STATE.changed, then, now, commits: [], diffOps };
+    return {
+      state: COMPARE_STATE.changed,
+      then,
+      now,
+      commits: [],
+      commitsTruncated: false,
+      commitsFetchFailed: false,
+      diffOps,
+      resliceCache: buildResliceCache({
+        oldLines,
+        newLines,
+        locatedAnchorLine: located.anchorLine,
+        path,
+        thenAnchorLine,
+        state: COMPARE_STATE.changed,
+        commits: [],
+        commitsTruncated: false,
+        commitsFetchFailed: false,
+        diffOps,
+      }),
+    };
   }
 
-  const { commits, commitsTruncated } = await touchedSinceComment();
+  const { commits, commitsTruncated, commitsFetchFailed } =
+    await touchedSinceComment();
   // 逐行相同：与「评论就挂在当前版本上」是同一个结论，依据也走同一个查询
   return {
     state: COMPARE_STATE.unchanged,
@@ -183,6 +334,19 @@ export async function buildComparePair(client, request) {
     now: null,
     commits,
     commitsTruncated,
+    commitsFetchFailed,
     diffOps: [],
+    resliceCache: buildResliceCache({
+      oldLines,
+      newLines,
+      locatedAnchorLine: located.anchorLine,
+      path,
+      thenAnchorLine,
+      state: COMPARE_STATE.unchanged,
+      commits,
+      commitsTruncated,
+      commitsFetchFailed,
+      diffOps: [],
+    }),
   };
 }

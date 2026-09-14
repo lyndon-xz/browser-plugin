@@ -35,14 +35,25 @@ const ICONS = {
 const isTabGoneError = (error) =>
   /No tab with id/i.test(error?.message ?? String(error));
 
-async function updateIcon(tabId, state) {
-  try {
-    await chrome.action.setIcon({ path: ICONS[state], tabId });
-  } catch (error) {
-    if (!isTabGoneError(error)) {
-      throw error;
-    }
+const goneTabs = new Set();
+chrome.tabs.onRemoved.addListener((tabId) => {
+  goneTabs.add(tabId);
+});
+
+function updateIcon(tabId, state) {
+  if (tabId == null || goneTabs.has(tabId)) {
+    return Promise.resolve();
   }
+
+  return new Promise((resolve) => {
+    chrome.action.setIcon({ path: ICONS[state], tabId }, () => {
+      const err = chrome.runtime.lastError;
+      if (err && !isTabGoneError(err)) {
+        console.warn("[search-sort] setIcon 失败：", err.message);
+      }
+      resolve();
+    });
+  });
 }
 
 function readConfigForURL(url) {

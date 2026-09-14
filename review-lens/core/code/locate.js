@@ -1,3 +1,4 @@
+import { isJavaLikePath } from "./language.js";
 import {
   findMethodRange,
   isMethodSignature,
@@ -91,11 +92,15 @@ function locateByMethodName(oldLines, newLines, anchorLine) {
   return { anchorLine: Math.min(newStart + offset, end) };
 }
 
+/** 在 MR 当前 head 版本里定位评论锚点对应的方法/行 */
 export function locateInNewVersion(request) {
-  const { oldLines, newLines, anchorLine } = request;
+  const { oldLines, newLines, anchorLine, path } = request;
 
-  return (
-    locateByMethodName(oldLines, newLines, anchorLine) ??
-    locateByLineText(oldLines, newLines, anchorLine)
-  );
+  if (isJavaLikePath(path)) {
+    return (
+      locateByMethodName(oldLines, newLines, anchorLine) ??
+      locateByLineText(oldLines, newLines, anchorLine)
+    );
+  }
+  return locateByLineText(oldLines, newLines, anchorLine);
 }

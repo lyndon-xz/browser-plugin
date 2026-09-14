@@ -4,32 +4,37 @@
  */
 
 const ENTRY_CLASS = "review-lens-entry";
+const BRAND_CLASS = "review-lens-entry-brand";
 
 const DISCUSSION_SELECTOR = "[data-discussion-id]";
 const ACTIONS_SELECTOR = ".discussion-actions";
+
+// GitLab MR 讨论列表常见容器，观察范围收窄到此处
+const DISCUSSION_ROOT_SELECTORS = [
+  "#notes-list",
+  ".notes",
+  "[data-testid='notes-discussion']",
+  ".discussions-list",
+];
+
+function findDiscussionRoot(root) {
+  for (const selector of DISCUSSION_ROOT_SELECTORS) {
+    const node = root.querySelector(selector);
+    if (node) {
+      return node;
+    }
+  }
+  return root;
+}
 
 function createEntry(discussionId, onOpen) {
   const button = document.createElement("button");
   button.className = ENTRY_CLASS;
   button.type = "button";
-  button.style.cssText = [
-    "display:inline-flex",
-    "gap:5px",
-    "align-items:center",
-    "height:24px",
-    "margin-right:6px",
-    "padding:0 8px",
-    "font:12px/1 inherit",
-    "color:#5a6579",
-    "background:#fff",
-    "border:1px solid #e4e8f2",
-    "border-radius:5px",
-    "cursor:pointer",
-  ].join(";");
+  button.setAttribute("aria-label", "解读这条代码评论");
 
   const brand = document.createElement("span");
-  brand.style.cssText =
-    "width:3px;height:11px;border-radius:2px;background:linear-gradient(#a8710f 50%,#147b5c 50%)";
+  brand.className = BRAND_CLASS;
 
   const label = document.createElement("span");
   label.textContent = "解读";
@@ -40,11 +45,13 @@ function createEntry(discussionId, onOpen) {
 }
 
 /**
- * getCodeDiscussionIds 返回 undefined 时不筛选（取讨论失败时的兜底）；
- * onDiscussionsMaybeStale 在 DOM 出现未知 discussionId 时触发，便于 reload 后补挂入口。
+ * getCodeDiscussionIds 返回 null 时不挂入口（取讨论失败）；
+ * 返回 Set 时只挂代码评论；onDiscussionsMaybeStale 在 DOM 出现未知 discussionId 时触发。
  */
 export function attachEntries(request) {
-  const { root, getCodeDiscussionIds, onDiscussionsMaybeStale, onOpen } = request;
+  const { root, getCodeDiscussionIds, onDiscussionsMaybeStale, onOpen } =
+    request;
+  const observeRoot = findDiscussionRoot(root);
 
   for (const leftover of root.querySelectorAll(`.${ENTRY_CLASS}`)) {
     leftover.remove();
@@ -72,6 +79,9 @@ export function attachEntries(request) {
   function attachTo(box) {
     const { discussionId } = box.dataset;
     const codeDiscussionIds = getCodeDiscussionIds?.();
+    if (codeDiscussionIds === null) {
+      return;
+    }
     if (codeDiscussionIds && !codeDiscussionIds.has(discussionId)) {
       scheduleStaleReload();
       return;
@@ -90,7 +100,7 @@ export function attachEntries(request) {
   }
 
   function scan() {
-    for (const box of root.querySelectorAll(DISCUSSION_SELECTOR)) {
+    for (const box of observeRoot.querySelectorAll(DISCUSSION_SELECTOR)) {
       attachTo(box);
     }
   }
@@ -105,7 +115,7 @@ export function attachEntries(request) {
   };
 
   const observer = new MutationObserver(scheduleScan);
-  observer.observe(root, { childList: true, subtree: true });
+  observer.observe(observeRoot, { childList: true, subtree: true });
 
   return () => {
     clearTimeout(scanTimer);

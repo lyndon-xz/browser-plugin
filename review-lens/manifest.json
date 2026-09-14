@@ -1,13 +1,19 @@
 {
   "manifest_version": 3,
   "name": "review-lens",
-  "version": "2.2.2",
+  "version": "2.1.0",
   "description": "在 GitLab MR 讨论页并排看「评论时的代码」与「修正后的代码」",
   "icons": {
     "16": "icons/active/icon-16.png",
     "32": "icons/active/icon-32.png",
     "48": "icons/active/icon-48.png",
     "128": "icons/active/icon-128.png"
+  },
+  "permissions": ["storage", "scripting"],
+  "optional_host_permissions": ["*://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
   },
   "action": {
     "default_title": "review-lens",
@@ -19,8 +25,6 @@
     },
     "default_popup": "popup/popup.html"
   },
-  "permissions": ["storage", "scripting"],
-  "optional_host_permissions": ["*://*/*"],
   "content_scripts": [
     {
       "matches": [
@@ -41,14 +45,11 @@
         "ui/*.js",
         "ui/*/*.js",
         "ui/*.css",
-        "ui/tokens.css"
+        "ui/tokens.css",
+        "ui/entries.css"
       ],
-      "matches": ["http://*/*", "https://*/*"]
+      "matches": ["<all_urls>"]
     }
   ],
-  "background": {
-    "service_worker": "background.js",
-    "type": "module"
-  },
   "options_page": "popup/settings.html"
 }

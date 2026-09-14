@@ -11,8 +11,7 @@ const WHOLE_METHOD_LIMIT = 60;
 // 方法名 = 签名里紧挨左括号的那个标识符。定位与切片共用这一份。
 const METHOD_NAME = /([A-Za-z_$][\w$]*)\s*\(/;
 
-const methodNameOf = (signature) =>
-  signature.match(METHOD_NAME)?.[1] ?? null;
+const methodNameOf = (signature) => signature.match(METHOD_NAME)?.[1] ?? null;
 
 /*
  * 数花括号前先去掉字符串、字符字面量与行注释：`log("{ ... }")` 里的花括号不该参与配平。
@@ -50,6 +49,7 @@ const SIGNATURE = /^\s*[\w<>[\],@.\s]*\([^;]*\)\s*(?:throws[\w\s,.]*)?\{\s*$/;
 const SIGNATURE_MULTILINE =
   /^\s*[\w<>[\],@.\s]*\)\s*(?:throws[\w\s,.]*)?\{\s*$/;
 
+/** 判断一行是否像 Java 方法签名行 */
 export function isMethodSignature(line) {
   if (NOT_A_SIGNATURE.test(line)) {
     return false;
@@ -158,6 +158,7 @@ export function sliceForDiff(lines, anchorLine, options = {}) {
   });
 }
 
+/** 展示用代码片段：锚点附近或整段方法，可额外上下扩行 */
 export function sliceForReading(lines, anchorLine, options = {}) {
   const { extraLines = 0, path } = options;
   const window = methodWindow(lines, anchorLine);

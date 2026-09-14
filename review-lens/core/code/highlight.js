@@ -80,6 +80,7 @@ const RULES = [
   { kind: "plain", pattern: /^[^\w$"'/]+|^\// },
 ];
 
+/** 把一行 Java 源码切成可着色的 token 序列 */
 export function tokenizeJava(line) {
   const tokens = [];
   let rest = String(line ?? "");

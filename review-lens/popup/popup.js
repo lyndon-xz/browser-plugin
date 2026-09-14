@@ -7,6 +7,7 @@ import { projectLabel, renderCardList, renderEmptyState } from "./cards.js";
 const root = document.getElementById("cards");
 const tally = document.getElementById("tally");
 const exportButton = document.getElementById("export");
+const searchInput = document.getElementById("search");
 
 // 卡片是这个页面的唯一数据源：删除后要从这里去掉，否则筛选一次被删的就复活了
 let cards = [];
@@ -19,6 +20,7 @@ function draw() {
 
   renderCardList(root, {
     cards,
+    searchQuery: searchInput?.value ?? "",
     onDelete: async (id) => {
       await ask(MESSAGE_ACTION.deleteCard, { id });
       cards = cards.filter((card) => card.id !== id);
@@ -27,17 +29,24 @@ function draw() {
   });
 }
 
+searchInput?.addEventListener("input", () => draw());
+
 exportButton.addEventListener("click", () => {
-  const blob = new Blob([toMarkdown(cards)], { type: "text/markdown" });
-  const url = URL.createObjectURL(blob);
+  try {
+    const blob = new Blob([toMarkdown(cards)], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
 
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `review-lens-${asDate(new Date().toISOString())}.md`;
-  link.click();
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `review-lens-${asDate(new Date().toISOString())}.md`;
+    link.click();
 
-  // 下载还没启动就回收会偶发拿到空文件，让出一轮再撤销
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+    // 下载还没启动就回收会偶发拿到空文件，让出一轮再撤销
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  } catch (error) {
+    exportButton.textContent = "导出失败";
+    exportButton.title = error.message;
+  }
 });
 
 /*

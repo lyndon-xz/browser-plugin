@@ -104,6 +104,23 @@ export function init() {
     return true;
   }
 
+  function addRuntimeListener() {
+    try {
+      chrome?.runtime?.onMessage?.addListener(onMessage);
+      return Boolean(chrome?.runtime?.onMessage);
+    } catch {
+      return false;
+    }
+  }
+
+  function removeRuntimeListener() {
+    try {
+      chrome?.runtime?.onMessage?.removeListener(onMessage);
+    } catch {
+      /* 扩展上下文已失效 */
+    }
+  }
+
   history.pushState = function (...args) {
     originalPushState.apply(this, args);
     if (!isApplying) {
@@ -118,11 +135,18 @@ export function init() {
     }
   };
 
-  chrome.runtime.onMessage.addListener(onMessage);
+  if (!addRuntimeListener()) {
+    releaseOrphanedScript();
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      releaseOrphanedScript();
+    };
+  }
+
   window.addEventListener("popstate", onPopState);
 
   return () => {
-    chrome.runtime.onMessage.removeListener(onMessage);
+    removeRuntimeListener();
     window.removeEventListener("popstate", onPopState);
     releaseOrphanedScript();
   };

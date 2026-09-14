@@ -18,11 +18,31 @@ const ACTIVE_ICONS = {
   128: "icons/active/icon-128.png",
 };
 
-// 只改上报过的那个标签页；Chrome 在标签页导航时会自动清掉标签页级的图标设置
-const setIconFor = (tabId, path) =>
-  tabId === undefined
-    ? Promise.resolve()
-    : chrome.action.setIcon({ tabId, path });
+const isTabGoneError = (error) =>
+  /No tab with id/i.test(error?.message ?? String(error));
+
+// 关标签后 content 仍可能上报 pageInactive，先记一笔避免对已消失的 tab 调 API
+const goneTabs = new Set();
+chrome.tabs.onRemoved.addListener((tabId) => {
+  goneTabs.add(tabId);
+});
+
+function setIconFor(tabId, path) {
+  if (tabId == null || goneTabs.has(tabId)) {
+    return Promise.resolve();
+  }
+
+  // 回调式 API 必须读 lastError；Promise 封装有时 tab 已关仍只写 lastError 不 reject
+  return new Promise((resolve) => {
+    chrome.action.setIcon({ tabId, path }, () => {
+      const err = chrome.runtime.lastError;
+      if (err && !isTabGoneError(err)) {
+        console.warn("[review-lens] setIcon 失败：", err.message);
+      }
+      resolve();
+    });
+  });
+}
 
 const lightUp = (tabId) => setIconFor(tabId, ACTIVE_ICONS);
 /*
@@ -49,8 +69,12 @@ const HANDLERS = {
   [MESSAGE_ACTION.unregisterOrigin]: (message) =>
     unregisterOrigin(chrome, message.origin),
   [MESSAGE_ACTION.openSettings]: () => chrome.runtime.openOptionsPage(),
-  [MESSAGE_ACTION.pageActive]: (_message, sender) => lightUp(sender?.tab?.id),
-  [MESSAGE_ACTION.pageInactive]: (_message, sender) => dimDown(sender?.tab?.id),
+  [MESSAGE_ACTION.pageActive]: (_message, sender) => {
+    void lightUp(sender?.tab?.id);
+  },
+  [MESSAGE_ACTION.pageInactive]: (_message, sender) => {
+    void dimDown(sender?.tab?.id);
+  },
 };
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {

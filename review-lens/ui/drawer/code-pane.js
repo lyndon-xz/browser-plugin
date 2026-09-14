@@ -1,3 +1,4 @@
+import { isJavaLikePath } from "../../core/code/language.js";
 import { tokenizeJava } from "../../core/code/highlight.js";
 
 /*
@@ -10,8 +11,10 @@ export const PANE_SIDE = { then: "then", now: "now" };
 
 /** panes.js 用这些选择器找代码栏与行 */
 export const CODE_CLASS = "code";
+/** 单行代码 DOM 的 class */
 export const CODE_LINE_CLASS = "code-line";
 
+/** 按绝对行号选中代码行元素 */
 export const codeLineSelector = (line) =>
   `.${CODE_LINE_CLASS}[data-line="${line}"]`;
 
@@ -45,7 +48,15 @@ function changedRows(diffOps, side) {
   return changed;
 }
 
-function appendTokens(target, text) {
+function appendPlain(target, text) {
+  target.append(document.createTextNode(text));
+}
+
+function appendTokens(target, text, useJavaHighlight) {
+  if (!useJavaHighlight) {
+    appendPlain(target, text);
+    return;
+  }
   for (const token of tokenizeJava(text)) {
     if (token.kind === "plain") {
       target.append(document.createTextNode(token.text));
@@ -59,33 +70,44 @@ function appendTokens(target, text) {
 }
 
 // 一行代码分两层着色：语法着色管「这是什么」，命中底色（.hit）管「评论提到的就是这个」
-function writeSource(target, text, hitIdentifiers) {
+function writeSource(target, text, hitIdentifiers, useJavaHighlight) {
   const matched = hitIdentifiers
     .filter((hit) => text.includes(hit))
     .sort((a, b) => b.length - a.length)[0];
 
   if (!matched) {
-    appendTokens(target, text);
+    appendTokens(target, text, useJavaHighlight);
     return;
   }
 
   const at = text.indexOf(matched);
-  appendTokens(target, text.slice(0, at));
+  appendTokens(target, text.slice(0, at), useJavaHighlight);
 
   const mark = document.createElement("span");
   mark.className = "hit";
-  appendTokens(mark, matched);
+  appendTokens(mark, matched, useJavaHighlight);
   target.append(mark);
 
   // 同一行里出现两次也都标上
   const rest = document.createElement("span");
-  writeSource(rest, text.slice(at + matched.length), hitIdentifiers);
+  writeSource(
+    rest,
+    text.slice(at + matched.length),
+    hitIdentifiers,
+    useJavaHighlight,
+  );
   target.append(rest);
 }
 
 function renderLine(line, context) {
   const { number, text } = line;
-  const { anchorLine, changedLines, changeType, hitIdentifiers } = context;
+  const {
+    anchorLine,
+    changedLines,
+    changeType,
+    hitIdentifiers,
+    useJavaHighlight,
+  } = context;
 
   const row = document.createElement("div");
   row.className = CODE_LINE_CLASS;
@@ -103,15 +125,17 @@ function renderLine(line, context) {
 
   const source = document.createElement("span");
   source.className = "src";
-  writeSource(source, text, hitIdentifiers);
+  writeSource(source, text, hitIdentifiers, useJavaHighlight);
 
   row.append(gutter, source);
   return row;
 }
 
+/** 渲染一侧代码栏（行号、着色、标识符高亮） */
 export function renderCodePane(snapshot, options) {
   const { label, side, diffOps, hitIdentifiers = [] } = options;
-  const { rangeStart, rangeEnd, lines, anchorLine } = snapshot;
+  const { rangeStart, rangeEnd, lines, anchorLine, path } = snapshot;
+  const useJavaHighlight = isJavaLikePath(path);
 
   const pane = document.createElement("section");
   pane.className = `pane ${side}`;
@@ -134,6 +158,7 @@ export function renderCodePane(snapshot, options) {
         changedLines,
         changeType: SIDE[side].className,
         hitIdentifiers,
+        useJavaHighlight,
       }),
     );
   }

@@ -19,6 +19,7 @@ export function createShell(request) {
   let hostOverflow = null;
   // 拖拽进行中被关掉（Esc、点外部）时也要解绑，否则监听会继续给已分离的节点写样式并写存储
   let releaseDrag = null;
+  let releaseFocusTrap = null;
 
   function closeOnEscape(event) {
     if (event.key === "Escape") {
@@ -110,10 +111,46 @@ export function createShell(request) {
     }
   }
 
+  /** 打开后把焦点收进抽屉，Tab 在抽屉内循环 */
+  function focusPanel(panel) {
+    releaseFocusTrap?.();
+    releaseFocusTrap = null;
+
+    const closeButton = panel.querySelector(".drawer-close");
+    closeButton?.focus();
+
+    const selector =
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const onKeyDown = (event) => {
+      if (event.key !== "Tab") {
+        return;
+      }
+      const items = [...panel.querySelectorAll(selector)].filter(
+        (el) => el.offsetParent !== null,
+      );
+      if (!items.length) {
+        return;
+      }
+      const first = items[0];
+      const last = items.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    panel.addEventListener("keydown", onKeyDown);
+    releaseFocusTrap = () => panel.removeEventListener("keydown", onKeyDown);
+  }
+
   function close() {
     document.removeEventListener("keydown", closeOnEscape);
     document.removeEventListener("mousedown", closeOnOutsideClick);
     releaseDrag?.();
+    releaseFocusTrap?.();
+    releaseFocusTrap = null;
     if (hostOverflow !== null) {
       document.body.style.overflow = hostOverflow;
       delete document.body.dataset.reviewLensOverflow;
@@ -132,6 +169,7 @@ export function createShell(request) {
     mount,
     attachGrip,
     clearContent,
+    focusPanel,
     close,
   };
 }

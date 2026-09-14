@@ -1,4 +1,9 @@
-import { CODE_CLASS, PANE_SIDE, codeLineSelector, renderCodePane } from "./code-pane.js";
+import {
+  CODE_CLASS,
+  PANE_SIDE,
+  codeLineSelector,
+  renderCodePane,
+} from "./code-pane.js";
 
 /*
  * 代码区：两栏本身、上面那条时间脊（视图切换与同步开关），以及滚动相关的四个动作。
@@ -57,8 +62,14 @@ function renderSyncToggle(request) {
 
 /** 时间脊：说清在看哪一段，并放视图切换与同步开关 */
 export function renderSpine(request) {
-  const { state, selectionText, view, isSyncScrollEnabled, onViewChange, onSyncChange } =
-    request;
+  const {
+    state,
+    selectionText,
+    view,
+    isSyncScrollEnabled,
+    onViewChange,
+    onSyncChange,
+  } = request;
 
   const spine = document.createElement("div");
   spine.className = "spine";
@@ -112,6 +123,10 @@ export function renderPanes(request) {
 
 const codePanesIn = (root) => [...root.querySelectorAll(`.${CODE_CLASS}`)];
 
+// 程序触发的滚动（跳转、扩行还原）期间不同步比例，否则两侧行数不一时会把另一栏滚错位
+let programmaticScrollDepth = 0;
+
+/** 读取两侧代码栏的滚动位置与 scrollHeight */
 export const readScroll = (root) =>
   codePanesIn(root).map((el) => ({
     top: el.scrollTop,
@@ -123,60 +138,115 @@ export const readScroll = (root) =>
  * 还没布局、取不到高度时退回像素值。
  */
 export function restoreScroll(root, wasAt) {
-  codePanesIn(root).forEach((el, index) => {
-    const was = wasAt[index];
-    if (was?.top == null) {
-      return;
-    }
-    el.scrollTop = was.height ? (was.top / was.height) * el.scrollHeight : was.top;
-  });
+  programmaticScrollDepth += 1;
+  try {
+    codePanesIn(root).forEach((el, index) => {
+      const was = wasAt[index];
+      if (was?.top == null) {
+        return;
+      }
+      el.scrollTop = was.height
+        ? (was.top / was.height) * el.scrollHeight
+        : was.top;
+    });
+  } finally {
+    programmaticScrollDepth -= 1;
+  }
 }
 
 /**
  * 滚到某一行并闪一下。class 靠 animationend 摘掉而不是 setTimeout：动画时长只留在
  * CSS 一处，也不会有抽屉关闭后仍在跑的定时器。
  */
-export function flashLine(root, line) {
-  const row = root.querySelector(codeLineSelector(line));
+function scrollPaneToLine(pane, line) {
+  const row = pane.querySelector(codeLineSelector(line));
   if (!row) {
-    return;
+    return false;
+  }
+  const paneRect = pane.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  pane.scrollTop +=
+    rowRect.top - paneRect.top - pane.clientHeight / 2 + row.offsetHeight / 2;
+  return true;
+}
+
+function codePanesFor(root, side) {
+  if (!side) {
+    return codePanesIn(root);
+  }
+  const pane = root.querySelector(`.pane.${side} .${CODE_CLASS}`);
+  return pane ? [pane] : [];
+}
+
+/** 滚到指定行并闪高亮；side 限定只滚某一侧（相关行来自评论时文件，不应误滚修正后） */
+export function flashLine(root, line, options = {}) {
+  const { side = null } = options;
+  let hitAny = false;
+
+  programmaticScrollDepth += 1;
+  try {
+    for (const pane of codePanesFor(root, side)) {
+      if (scrollPaneToLine(pane, line)) {
+        hitAny = true;
+      }
+    }
+
+    const rowSelector = side
+      ? `.pane.${side} ${codeLineSelector(line)}`
+      : codeLineSelector(line);
+    for (const row of root.querySelectorAll(rowSelector)) {
+      hitAny = true;
+      row.classList.add("flash");
+      row.addEventListener(
+        "animationend",
+        () => row.classList.remove("flash"),
+        {
+          once: true,
+        },
+      );
+    }
+  } finally {
+    programmaticScrollDepth -= 1;
   }
 
-  row.scrollIntoView({ block: "center" });
-  row.classList.add("flash");
-  row.addEventListener("animationend", () => row.classList.remove("flash"), {
-    once: true,
-  });
+  return hitAny;
 }
 
 /**
  * 两栏滚动同步。readSyncing 是取值函数而不是布尔：监听常驻，勾选状态在滚动那一刻才读——
  * 为这个开关重绘会把两侧滚动位置清回开头。isEchoing 挡住回弹，否则两侧互相触发。
  */
+/** 绑定两栏同步滚动；返回解绑函数，重绘前须先调 */
 export function linkScroll(panes, readSyncing) {
   const [a, b] = panes.querySelectorAll(`.${CODE_CLASS}`);
   if (!a || !b) {
-    return;
+    return () => {};
   }
 
+  const controller = new AbortController();
   let isEchoing = false;
   const scrollRatio = (el) => {
     const range = el.scrollHeight - el.clientHeight;
     return range > 0 ? el.scrollTop / range : 0;
   };
   const link = (from, to) =>
-    from.addEventListener("scroll", () => {
-      if (!readSyncing() || isEchoing) {
-        return;
-      }
-      isEchoing = true;
-      const range = to.scrollHeight - to.clientHeight;
-      to.scrollTop = scrollRatio(from) * range;
-      requestAnimationFrame(() => {
-        isEchoing = false;
-      });
-    });
+    from.addEventListener(
+      "scroll",
+      () => {
+        if (!readSyncing() || isEchoing || programmaticScrollDepth > 0) {
+          return;
+        }
+        isEchoing = true;
+        const range = to.scrollHeight - to.clientHeight;
+        to.scrollTop = scrollRatio(from) * range;
+        requestAnimationFrame(() => {
+          isEchoing = false;
+        });
+      },
+      { signal: controller.signal },
+    );
 
   link(a, b);
   link(b, a);
+  return () => controller.abort();
 }

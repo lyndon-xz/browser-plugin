@@ -1,0 +1,36 @@
+/* 宿主页「解读」入口：与 ui/tokens.css 同色，但不能进 Shadow DOM，单独注入 */
+.review-lens-entry {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  height: 24px;
+  margin-right: 6px;
+  padding: 0 8px;
+  font: 12px/1 inherit;
+  color: #5a6579;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #e4e8f2;
+  border-radius: 5px;
+}
+
+.review-lens-entry:hover {
+  border-color: #c8d0e0;
+}
+
+.review-lens-entry-brand {
+  width: 3px;
+  height: 11px;
+  border-radius: 2px;
+  background: linear-gradient(#a8710f 50%, #147b5c 50%);
+}
+
+.review-lens-truncation-notice {
+  margin: 8px 16px;
+  padding: 8px 12px;
+  font: 13px/1.5 inherit;
+  color: #5a6579;
+  background: #fff8e6;
+  border: 1px solid #f0d998;
+  border-radius: 6px;
+}

@@ -10,6 +10,7 @@ const ALL = "__all__";
 
 const EMPTY_HINT = "在 GitLab 的代码评论旁点「解读」，看懂一条就存下来。";
 
+/** 卡片列表为空或读失败时的占位块 */
 export function renderEmptyState(request) {
   const { title = "还没有卡片", detail } = request;
 
@@ -40,6 +41,7 @@ function previewText(text) {
   return `${text.slice(0, PREVIEW_MAX_CHARS)}…`;
 }
 
+/** 卡片所属仓库的展示标签 */
 export const projectLabel = (card) =>
   card.source.projectPath ?? decodeURIComponent(card.source.project ?? "");
 
@@ -61,7 +63,10 @@ function miniPair(card) {
 
   const then = document.createElement("div");
   then.className = "m-then";
-  then.append(tag("评论时"), document.createTextNode(previewText(card.thenCode)));
+  then.append(
+    tag("评论时"),
+    document.createTextNode(previewText(card.thenCode)),
+  );
 
   const now = document.createElement("div");
   now.className = "m-now";
@@ -103,8 +108,7 @@ function cardRow(card, handlers) {
 
   const noteEl = document.createElement("p");
   noteEl.className = "card-note";
-  noteEl.textContent =
-    note != null && note !== "" ? note : comment.body;
+  noteEl.textContent = note != null && note !== "" ? note : comment.body;
 
   const foot = document.createElement("div");
   foot.className = "card-foot";
@@ -141,21 +145,44 @@ function cardRow(card, handlers) {
   return row;
 }
 
+function matchesQuery(card, query) {
+  if (!query) {
+    return true;
+  }
+  const haystack = [
+    card.symbol,
+    card.note,
+    card.comment?.body,
+    card.thenCode,
+    card.nowCode,
+    projectLabel(card),
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .toLowerCase();
+  return haystack.includes(query.toLowerCase());
+}
+
+/** 渲染可删除的卡片列表 */
 export function renderCardList(root, request) {
-  const { cards, onDelete } = request;
+  const { cards, onDelete, searchQuery = "" } = request;
 
   let filter = ALL;
+  const query = searchQuery.trim().toLowerCase();
 
   function draw() {
     root.replaceChildren();
 
     // 0 张卡片时筛选条与列表都是死控件，只留一句结论加一句怎么做
     if (!cards.length) {
-      root.append(renderEmptyState({ title: "还没有卡片", detail: EMPTY_HINT }));
+      root.append(
+        renderEmptyState({ title: "还没有卡片", detail: EMPTY_HINT }),
+      );
       return;
     }
 
-    const projects = [...new Set(cards.map(projectLabel))];
+    const searchable = cards.filter((card) => matchesQuery(card, query));
+    const projects = [...new Set(searchable.map(projectLabel))];
     const filters = document.createElement("div");
     filters.className = "filters";
 
@@ -165,8 +192,8 @@ export function renderCardList(root, request) {
     ]) {
       const count =
         value === ALL
-          ? cards.length
-          : cards.filter((card) => projectLabel(card) === value).length;
+          ? searchable.length
+          : searchable.filter((card) => projectLabel(card) === value).length;
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "chip";
@@ -182,13 +209,13 @@ export function renderCardList(root, request) {
 
     const shown =
       filter === ALL
-        ? cards
-        : cards.filter((card) => projectLabel(card) === filter);
+        ? searchable
+        : searchable.filter((card) => projectLabel(card) === filter);
     if (!shown.length) {
       root.append(
         renderEmptyState({
-          title: "这个仓库还没有卡片",
-          detail: EMPTY_HINT,
+          title: query ? "没有匹配的卡片" : "这个仓库还没有卡片",
+          detail: query ? "换个关键词试试。" : EMPTY_HINT,
         }),
       );
       return;

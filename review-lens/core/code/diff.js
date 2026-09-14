@@ -24,6 +24,7 @@ function longestCommonLengths(then, now) {
   return lengths;
 }
 
+/** 行级 LCS 差异；超大方法体在 MAX_DIFF_LINES 处截断 */
 export function diffLines(thenLines, nowLines) {
   const then = thenLines.slice(0, MAX_DIFF_LINES);
   const now = nowLines.slice(0, MAX_DIFF_LINES);

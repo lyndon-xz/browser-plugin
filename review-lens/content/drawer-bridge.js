@@ -38,12 +38,21 @@ export function createDrawerBridge(request) {
 
   let drawer = null;
   let building = null;
-  let buildError = null;
+  let pendingRenderState = null;
+
+  function retryBuild() {
+    building = null;
+    void ensure()
+      .then((instance) => {
+        if (!isAlive() || !pendingRenderState) {
+          return;
+        }
+        instance.render(pendingRenderState);
+      })
+      .catch((error) => renderEnsureFailure(error, retryBuild));
+  }
 
   function ensure() {
-    if (buildError) {
-      return Promise.reject(buildError);
-    }
     building ??= (async () => {
       try {
         let settings = {};
@@ -57,6 +66,8 @@ export function createDrawerBridge(request) {
           throw new Error("挂载已失效");
         }
 
+        // 上次构建失败时可能留下无样式的占位抽屉，成功前要先卸掉
+        drawer?.close();
         drawer = createDrawer({
           styleText: await loadStyleText(),
           site: { origin, projectPath: ref.projectPath },
@@ -71,7 +82,6 @@ export function createDrawerBridge(request) {
         });
         return drawer;
       } catch (error) {
-        buildError = error;
         building = null;
         throw error;
       }
@@ -80,12 +90,15 @@ export function createDrawerBridge(request) {
     return building;
   }
 
-  function renderBuildFailure(error) {
+  function renderEnsureFailure(error, onRetry) {
     if (!isAlive()) {
       return;
     }
     if (!drawer) {
-      drawer = createDrawer({ styleText: "", site: { origin, projectPath: ref.projectPath } });
+      drawer = createDrawer({
+        styleText: "",
+        site: { origin, projectPath: ref.projectPath },
+      });
     }
     drawer.render({
       status: DRAWER_STATUS.failed,
@@ -94,15 +107,18 @@ export function createDrawerBridge(request) {
         status: 0,
         message: error?.message ?? "抽屉没能打开",
       },
+      onRetry,
     });
   }
 
   return {
     ensure,
+    renderEnsureFailure,
     render: (state) => {
       if (!isAlive()) {
         return;
       }
+      pendingRenderState = state;
       if (drawer) {
         drawer.render(state);
         return;
@@ -113,7 +129,7 @@ export function createDrawerBridge(request) {
             instance.render(state);
           }
         })
-        .catch(renderBuildFailure);
+        .catch((error) => renderEnsureFailure(error, retryBuild));
     },
     close: () => drawer?.close(),
   };

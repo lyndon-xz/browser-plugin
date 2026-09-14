@@ -1,4 +1,6 @@
+import { isJavaLikePath } from "../../core/code/language.js";
 import {
+  COMMITS_FETCH_FAILED_NOTE,
   UNLOCATABLE_SHORT,
   UNLOCATABLE_TITLE,
   unlocatableDrawerDetail,
@@ -7,11 +9,7 @@ import { COMPARE_STATE } from "../../core/compare.js";
 import { asDate } from "../../core/date.js";
 import { DRAWER_STATUS } from "./status.js";
 
-/*
- * 结论区：顶栏、徽标、在看哪一段的说明，以及右侧没有代码可给时的那段结论。
- * 全是纯函数，只有顶栏需要一个关闭回调。
- */
-
+/** 抽屉顶栏：文件名、路径与关闭按钮 */
 export function renderHead(request) {
   const { thread, onClose } = request;
 
@@ -56,9 +54,13 @@ export function describeSelection(state) {
     ops.filter((op) => op.type === "add").length,
   );
 
-  return changedLineCount
+  const base = changedLineCount
     ? `${scope} · ${span} · ${changedLineCount} 行有改动`
     : `${scope} · ${span}`;
+  if (isJavaLikePath(then.path)) {
+    return base;
+  }
+  return `${base} · 非 Java，按锚点附近展示`;
 }
 
 /*
@@ -71,6 +73,7 @@ const BADGES = {
   [COMPARE_STATE.unlocatable]: UNLOCATABLE_SHORT,
 };
 
+/** 评论卡片上的对照结论徽标；loading 时返回 null */
 export function badgeFor(state) {
   if (state.status === DRAWER_STATUS.loading) {
     return null;
@@ -125,9 +128,17 @@ export function renderNoCode(state) {
 
   if (state.state === COMPARE_STATE.unlocatable) {
     title.textContent = UNLOCATABLE_TITLE;
-    detail.textContent = unlocatableDrawerDetail(Boolean(state.commits?.length));
+    detail.textContent = unlocatableDrawerDetail(
+      Boolean(state.commits?.length),
+    );
 
     box.append(title, detail);
+    if (state.commitsFetchFailed) {
+      const warn = document.createElement("p");
+      warn.className = "commit-fetch-failed";
+      warn.textContent = COMMITS_FETCH_FAILED_NOTE;
+      box.append(warn);
+    }
     if (state.commits?.length) {
       box.append(renderCommitTrail(state.commits, state.commitsTruncated));
     }
@@ -142,8 +153,16 @@ export function renderNoCode(state) {
     "这段代码就是当前分支上的样子，评论提的问题现在仍然成立。" +
     (touched
       ? `评论之后有 ${touched}${state.commitsTruncated ? "+" : ""} 个提交动过这个文件，但没有动到这段代码。`
-      : "评论之后这个文件没有任何提交。");
+      : state.commitsFetchFailed
+        ? "评论之后的提交记录没能拉到。"
+        : "评论之后这个文件没有任何提交。");
 
   box.append(title, detail);
+  if (state.commitsFetchFailed && !touched) {
+    const warn = document.createElement("p");
+    warn.className = "commit-fetch-failed";
+    warn.textContent = COMMITS_FETCH_FAILED_NOTE;
+    box.append(warn);
+  }
   return box;
 }

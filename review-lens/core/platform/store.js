@@ -83,6 +83,7 @@ function mergeSettings(current, patch) {
   return next;
 }
 
+/** chrome.storage 之上的卡片与设置存储；写入串行避免互相覆盖 */
 export function createStore(storage) {
   // 只等它结束、不关心成败：队列不能被一次失败掐断，失败由发起那次写入的调用方接管
   const settled = async (promise) => {
@@ -119,18 +120,30 @@ export function createStore(storage) {
   }
 
   async function saveCardNow(card) {
-    // 写入前再读一次：队列能串行同 SW 内的任务，但 SW 重启后仍可能基于旧快照
-    const fresh = await listCards();
-    const existing = fresh.find((item) => sameThread(item.source, card.source));
-    const saved = {
-      ...card,
-      id: existing?.id ?? `c_${Date.now()}_${card.source.discussionId.slice(0, 8)}`,
-      savedAt: new Date().toISOString(),
-    };
-    const rest = fresh.filter((item) => !sameThread(item.source, card.source));
-    // 让存储失败冒出去：静默丢卡片等于用户以为存下了、其实没有
-    await storage.set({ [CARDS]: [saved, ...rest] });
-    return saved;
+    // 写入前再读、写后校验：同 SW 内靠队列，跨 tab / SW 重启靠短重试合并
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const fresh = await listCards();
+      const existing = fresh.find((item) =>
+        sameThread(item.source, card.source),
+      );
+      const saved = {
+        ...card,
+        id:
+          existing?.id ??
+          `c_${Date.now()}_${card.source.discussionId.slice(0, 8)}`,
+        savedAt: new Date().toISOString(),
+      };
+      const rest = fresh.filter(
+        (item) => !sameThread(item.source, card.source),
+      );
+      await storage.set({ [CARDS]: [saved, ...rest] });
+
+      const verify = await findCard(card.source);
+      if (verify?.savedAt === saved.savedAt) {
+        return saved;
+      }
+    }
+    throw new Error("存储冲突，请再试一次");
   }
 
   async function deleteCardNow(id) {
@@ -145,9 +158,25 @@ export function createStore(storage) {
 
   // 返回合并后的完整设置：设置页拿它当新的内存状态，不返回就会把 settings 置成 undefined
   async function writeSettingsNow(patch) {
-    const next = mergeSettings(await readSettings(), patch);
-    await storage.set({ [SETTINGS]: toStored(next) });
-    return next;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const current = await readSettings();
+      const next = mergeSettings(current, patch);
+      await storage.set({ [SETTINGS]: toStored(next) });
+      const verify = await readSettings();
+      const patchKeys = Object.keys(patch);
+      const merged = patchKeys.every((key) => {
+        const left = verify[key];
+        const right = next[key];
+        if (key === "tokens" || key === "extraOrigins") {
+          return JSON.stringify(left) === JSON.stringify(right);
+        }
+        return left === right;
+      });
+      if (merged) {
+        return next;
+      }
+    }
+    throw new Error("设置没能保存，请再试一次");
   }
 
   return {

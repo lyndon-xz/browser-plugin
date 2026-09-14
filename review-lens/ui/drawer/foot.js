@@ -82,8 +82,16 @@ function renderNoteInput(request) {
 // 卡片是自洽的：离开这条 MR 之后，光看卡片也能想起当时读懂了什么
 function buildCard(state, site, note) {
   const { thread, then, now, state: compareState } = state;
-  const { path, anchorLine, discussionId, noteId, author, createdAt, body, replies } =
-    thread;
+  const {
+    path,
+    anchorLine,
+    discussionId,
+    noteId,
+    author,
+    createdAt,
+    body,
+    replies,
+  } = thread;
 
   return {
     source: {
@@ -102,7 +110,7 @@ function buildCard(state, site, note) {
       body,
     },
     replies: replies ?? [],
-    thenCode: then.lines.map((line) => line.text).join("\n"),
+    thenCode: then?.lines.map((line) => line.text).join("\n") ?? "",
     // null 只表示没有第二份代码；定位不到还是未改动看 compareState
     nowCode: now ? now.lines.map((line) => line.text).join("\n") : null,
     compareState: compareState ?? COMPARE_STATE.unchanged,
@@ -111,7 +119,7 @@ function buildCard(state, site, note) {
 }
 
 function renderWidenButtons(request) {
-  const { extraLines, isWholeMethod, onWiden } = request;
+  const { extraLines, isWholeMethod, discussionId, onWiden } = request;
 
   const buttons = [];
 
@@ -120,7 +128,9 @@ function renderWidenButtons(request) {
   widen.type = "button";
   widen.className = "btn btn-widen";
   widen.textContent = `上下各多看 ${WIDEN_STEP} 行`;
-  widen.addEventListener("click", () => onWiden(extraLines + WIDEN_STEP));
+  widen.addEventListener("click", () =>
+    onWiden(extraLines + WIDEN_STEP, discussionId),
+  );
   buttons.push(widen);
 
   if (extraLines) {
@@ -128,7 +138,7 @@ function renderWidenButtons(request) {
     reset.type = "button";
     reset.className = "btn btn-reset";
     reset.textContent = isWholeMethod ? "回到这个方法" : "回到评论附近";
-    reset.addEventListener("click", () => onWiden(0));
+    reset.addEventListener("click", () => onWiden(0, discussionId));
     buttons.push(reset);
   }
   return buttons;
@@ -185,22 +195,25 @@ export function renderFoot(request) {
   const foot = document.createElement("footer");
   foot.className = "drawer-foot";
 
-  foot.append(
-    ...renderWidenButtons({
-      extraLines: extraLines ?? 0,
-      isWholeMethod: then.isWholeMethod,
-      onWiden,
-    }),
-  );
+  if (then) {
+    foot.append(
+      ...renderWidenButtons({
+        extraLines: extraLines ?? 0,
+        isWholeMethod: then.isWholeMethod,
+        discussionId: thread.discussionId,
+        onWiden,
+      }),
+    );
 
-  const candidates = relatedLines({
-    body: thread.body,
-    lines: then.lines,
-    anchorLine: thread.anchorLine,
-  });
+    const candidates = relatedLines({
+      body: thread.body,
+      lines: then.lines,
+      anchorLine: then.anchorLine,
+    });
 
-  if (candidates.length) {
-    foot.append(renderRelatedButton({ candidates, onFlashLine }));
+    if (candidates.length) {
+      foot.append(renderRelatedButton({ candidates, onFlashLine }));
+    }
   }
 
   const noteInput = renderNoteInput({ note, onNoteChange });

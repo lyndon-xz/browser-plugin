@@ -99,7 +99,9 @@ function drawOrigins() {
         delete tokens[hostOf(origin)];
         settings = await ask(MESSAGE_ACTION.writeSettings, {
           patch: {
-            extraOrigins: settings.extraOrigins.filter((kept) => kept !== origin),
+            extraOrigins: settings.extraOrigins.filter(
+              (kept) => kept !== origin,
+            ),
             tokens,
           },
         });

@@ -8,20 +8,30 @@ import { ERROR_KIND, GitLabRequestError } from "./client.js";
 /** 锚点落在 diff 的哪一侧。new_line 缺失说明这行在新版本已被删掉，只能按旧侧定位 */
 export const ANCHOR_SIDE = { old: "old", new: "new" };
 
+/** 「评论时」文件版本里用来切片的锚点行号：旧侧用 old_line，新侧用 new_line */
+export function thenAnchorLineFor(thread) {
+  const { anchorLine, anchorSide, position } = thread;
+  if (anchorSide === ANCHOR_SIDE.old) {
+    return position.old_line ?? anchorLine;
+  }
+  return position.new_line ?? anchorLine;
+}
+
 // position_type 不是 text 的 DiffNote 挂在图片或整个文件上，没有行号，进来会产出无从定位的 thread
 const isCodeComment = (note) =>
-  !note.system && note.type === "DiffNote" && note.position?.position_type === "text";
+  !note.system &&
+  note.type === "DiffNote" &&
+  note.position?.position_type === "text";
 
 function toThread(discussion, note, mrHeadSha) {
+  const { id: noteId, author, created_at: createdAt, body, position } = note;
   const {
-    id: noteId,
-    author,
-    created_at: createdAt,
-    body,
-    position,
-  } = note;
-  const { new_line: newLine, old_line: oldLine, new_path: newPath, old_path: oldPath, head_sha: headSha } =
-    position;
+    new_line: newLine,
+    old_line: oldLine,
+    new_path: newPath,
+    old_path: oldPath,
+    head_sha: headSha,
+  } = position;
   // 评论落在被删掉的行上时只有 old_line，此时锚点要按旧版本那一侧定位
   const anchorSide = newLine == null ? ANCHOR_SIDE.old : ANCHOR_SIDE.new;
 
@@ -54,6 +64,7 @@ const DISCUSSIONS_PER_PAGE = 100;
 // 页数上限防的是实例侧意外：忽略 page 参数的实例会让「取满一页就再取一页」永远成立
 const MAX_PAGES = 20;
 
+/** 讨论分页上限；触达后 discussionsTruncated 为 true */
 export const MAX_LOADED_DISCUSSIONS = DISCUSSIONS_PER_PAGE * MAX_PAGES;
 
 async function loadAllDiscussions(client, base) {
@@ -64,7 +75,11 @@ async function loadAllDiscussions(client, base) {
     );
     // 错误载荷不是数组，展开它只会抛一个没有 kind 的裸 TypeError，界面只能说「未知错误」
     if (!Array.isArray(batch)) {
-      throw new GitLabRequestError(ERROR_KIND.unexpected, 0, "讨论列表的响应不是预期的数组");
+      throw new GitLabRequestError(
+        ERROR_KIND.unexpected,
+        0,
+        "讨论列表的响应不是预期的数组",
+      );
     }
 
     all.push(...batch);
@@ -80,9 +95,11 @@ async function loadAllDiscussions(client, base) {
   };
 }
 
+/** 读取 MR 元数据（含 diff_refs） */
 export const loadMergeRequest = (client, ref) =>
   client.get(`/projects/${ref.project}/merge_requests/${ref.mrIid}`);
 
+/** 拉取 MR 讨论并归一为 ReviewThread 列表 */
 export async function loadThreads(client, ref) {
   const base = `/projects/${ref.project}/merge_requests/${ref.mrIid}`;
   const [mergeRequest, discussionPage] = await Promise.all([
@@ -93,7 +110,11 @@ export async function loadThreads(client, ref) {
 
   // 不可 diff 的 MR（无提交、冲突严重）没有 diff_refs，直取下一级会抛裸 TypeError
   if (!mergeRequest.diff_refs?.head_sha) {
-    throw new GitLabRequestError(ERROR_KIND.notFound, 0, "这条 MR 取不到 diff 基准");
+    throw new GitLabRequestError(
+      ERROR_KIND.notFound,
+      0,
+      "这条 MR 取不到 diff 基准",
+    );
   }
 
   const mrHeadSha = mergeRequest.diff_refs.head_sha;

@@ -21,7 +21,11 @@
   let teardown = null;
 
   function unmount() {
-    teardown?.();
+    try {
+      teardown?.();
+    } catch {
+      /* 扩展上下文已失效时 teardown 可能访问不到 chrome API */
+    }
     teardown = null;
   }
 

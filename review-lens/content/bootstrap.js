@@ -101,7 +101,17 @@
 
   window.addEventListener("popstate", syncOnce);
   // 页面被丢弃或转入缓存时也要收干净，监听不留在即将不可见的文档上
-  window.addEventListener("pagehide", unmount);
+  window.addEventListener("pagehide", (event) => {
+    if (!event.persisted) {
+      unmount();
+    }
+  });
+
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted && !teardown) {
+      syncOnce();
+    }
+  });
 
   syncOnce();
 })();

@@ -34,6 +34,7 @@ export function tokensByHost(tokens) {
   return next;
 }
 
+/** 按当前页 origin 的 hostname 取访问令牌 */
 export function tokenForPage(tokens, pageOrigin) {
   return tokensByHost(tokens)[hostOf(pageOrigin)] ?? null;
 }

@@ -1,5 +1,6 @@
+import { minimalExtraForRelatedHit } from "../core/comment/related.js";
 import { discussionsTruncatedMessage } from "../core/compare-copy.js";
-import { buildComparePair } from "../core/compare.js";
+import { buildComparePair, resliceComparePair } from "../core/compare.js";
 import { ERROR_KIND, createGitLabClient } from "../core/gitlab/client.js";
 import { parseMergeRequestRef } from "../core/gitlab/page.js";
 import { MAX_LOADED_DISCUSSIONS } from "../core/gitlab/thread.js";
@@ -17,6 +18,30 @@ import { createThreads } from "./threads.js";
  * 并决定「点开一条评论」时依次发生什么。三块各自的实现在同目录的另外几个文件里。
  */
 
+const TRUNCATION_NOTICE_CLASS = "review-lens-truncation-notice";
+
+function showDiscussionsTruncationNotice(root) {
+  if (root.querySelector(`.${TRUNCATION_NOTICE_CLASS}`)) {
+    return;
+  }
+  const banner = document.createElement("div");
+  banner.className = TRUNCATION_NOTICE_CLASS;
+  banner.setAttribute("role", "status");
+  banner.textContent = discussionsTruncatedMessage(MAX_LOADED_DISCUSSIONS);
+  root.prepend(banner);
+}
+
+const ensureEntryStyles = () => {
+  if (document.getElementById("review-lens-entry-styles")) {
+    return;
+  }
+  const link = document.createElement("link");
+  link.id = "review-lens-entry-styles";
+  link.rel = "stylesheet";
+  link.href = chrome.runtime.getURL("ui/entries.css");
+  document.head.append(link);
+};
+
 const readCss = async () => {
   const [tokensResponse, drawerResponse] = await Promise.all([
     fetch(chrome.runtime.getURL("ui/tokens.css")),
@@ -32,6 +57,7 @@ const readCss = async () => {
   return `${tokensText}\n${drawerText}`;
 };
 
+/** 编排入口、评审数据与抽屉；由 bootstrap 在 MR 页挂载 */
 export async function init(overrides = {}) {
   const {
     isMountCurrent = () => true,
@@ -61,6 +87,8 @@ export async function init(overrides = {}) {
 
   let isActive = true;
   let openedDiscussionId = null;
+  // 扩行只重切片段，沿用上次成功打开时的 thread 与对照基准，不依赖 reload 时序
+  let lastOpenContext = null;
 
   const alive = () => isActive && isMountCurrent();
 
@@ -76,7 +104,8 @@ export async function init(overrides = {}) {
     readSettings,
     writeSettings,
     saveCard,
-    onWiden: (extraLines) => reopen({ extraLines }),
+    onWiden: (extraLines, discussionId) =>
+      reopen({ discussionId, extraLines, isWiden: true }),
     isAlive: alive,
   });
 
@@ -111,16 +140,27 @@ export async function init(overrides = {}) {
   }
 
   async function open(request) {
-    const { discussionId, extraLines = 0 } = request;
+    const { discussionId, extraLines = 0, isWiden = false } = request;
 
     openedDiscussionId = discussionId;
-    await drawer.ensure();
+    try {
+      await drawer.ensure();
+    } catch (error) {
+      if (!alive()) {
+        return;
+      }
+      drawer.renderEnsureFailure(error, () =>
+        runDetached("打开抽屉失败", () => open(request)),
+      );
+      return;
+    }
     if (!alive()) {
       return;
     }
 
-    // 每次打开前刷新 MR head 与讨论列表，避免长时间停留同页后对照基准过期
-    await threads.reload();
+    // 讨论列表在 init 与 refreshDiscussions 已拉过；每条评论再 reload 会重复打满 MR API
+
+    await threads.whenReady();
     if (!alive()) {
       return;
     }
@@ -130,7 +170,16 @@ export async function init(overrides = {}) {
       return;
     }
 
-    const thread = threads.threadFor(discussionId);
+    const cached =
+      isWiden &&
+      lastOpenContext?.thread?.discussionId === discussionId &&
+      lastOpenContext;
+    const thread =
+      cached?.thread ??
+      threads.threadFor(discussionId) ??
+      (lastOpenContext?.thread?.discussionId === discussionId
+        ? lastOpenContext.thread
+        : null);
     if (!thread) {
       if (!alive()) {
         return;
@@ -138,11 +187,11 @@ export async function init(overrides = {}) {
       drawer.render({
         status: DRAWER_STATUS.failed,
         error: {
-          kind: ERROR_KIND.notFound,
+          kind: ERROR_KIND.unexpected,
           status: 0,
           message: threads.discussionsTruncated
             ? discussionsTruncatedMessage(MAX_LOADED_DISCUSSIONS)
-            : "找不到这条讨论，可能已被删除或尚未加载到",
+            : "找不到这条讨论，可能已被删除或尚未加载到。点重试或稍等讨论列表刷新完成后再试。",
         },
         onRetry: () => reopen({ discussionId }),
         onConfigureToken: () => runDetached("打不开设置页", openSettings),
@@ -150,30 +199,79 @@ export async function init(overrides = {}) {
       return;
     }
 
-    drawer.render({ status: DRAWER_STATUS.loading, thread });
+    if (!isWiden) {
+      drawer.render({ status: DRAWER_STATUS.loading, thread });
+    }
     try {
-      const pair = await buildComparePair(client, {
-        project: ref.project,
-        thread,
-        mrHeadSha: threads.mrHeadSha,
-        sourceBranch: threads.sourceBranch,
-        extraLines,
+      let mrHeadSha = cached?.mrHeadSha ?? threads.mrHeadSha;
+      const sourceBranch = cached?.sourceBranch ?? threads.sourceBranch;
+      let useReslice = isWiden && cached?.resliceCache;
+      if (useReslice) {
+        const liveHead = await threads.refreshHead();
+        if (!alive()) {
+          return;
+        }
+        if (liveHead) {
+          if (liveHead !== cached.mrHeadSha) {
+            useReslice = false;
+          }
+          mrHeadSha = liveHead;
+        }
+      }
+      let pair = useReslice
+        ? resliceComparePair(cached.resliceCache, extraLines)
+        : await buildComparePair(client, {
+            project: ref.project,
+            thread,
+            mrHeadSha,
+            sourceBranch,
+            extraLines,
+          });
+      if (!alive() || openedDiscussionId !== discussionId) {
+        return;
+      }
+
+      let cache = pair.resliceCache ?? cached?.resliceCache ?? null;
+      const autoExtra = minimalExtraForRelatedHit({
+        fileLines: cache?.oldLines,
+        then: pair.then,
+        body: thread.body,
       });
+      const effectiveExtra = Math.max(extraLines, autoExtra);
+      if (effectiveExtra !== extraLines && cache && pair.then) {
+        pair = resliceComparePair(cache, effectiveExtra);
+        cache = pair.resliceCache ?? cache;
+      }
+
+      const savedCardId =
+        isWiden && cached?.savedCardId != null
+          ? cached.savedCardId
+          : await savedCardIdFor(discussionId);
       if (!alive() || openedDiscussionId !== discussionId) {
         return;
       }
 
-      const savedCardId = await savedCardIdFor(discussionId);
-      if (!alive() || openedDiscussionId !== discussionId) {
-        return;
-      }
-
+      const { resliceCache, ...compareResult } = pair;
+      cache = resliceCache ?? cache;
+      const searchLines = cache?.oldLines?.map((text, index) => ({
+        number: index + 1,
+        text,
+      }));
+      lastOpenContext = {
+        thread,
+        mrHeadSha,
+        sourceBranch,
+        resliceCache: cache,
+        savedCardId,
+      };
       drawer.render({
         status: DRAWER_STATUS.ready,
         thread,
-        ...pair,
-        extraLines,
+        ...compareResult,
+        extraLines: effectiveExtra,
         savedCardId,
+        isWiden,
+        searchLines,
       });
     } catch (error) {
       if (!alive() || openedDiscussionId !== discussionId) {
@@ -184,7 +282,7 @@ export async function init(overrides = {}) {
         status: DRAWER_STATUS.failed,
         thread,
         error,
-        onRetry: () => reopen({ extraLines }),
+        onRetry: () => reopen({ discussionId, extraLines }),
         onConfigureToken: () => runDetached("打不开设置页", openSettings),
       });
     }
@@ -195,15 +293,22 @@ export async function init(overrides = {}) {
     return () => {};
   }
 
-  let codeDiscussionIds = threads.threadsError ? undefined : threads.discussionIds;
+  // null = 取讨论失败，不挂入口；Set = 只挂代码评论
+  let codeDiscussionIds = threads.threadsError ? null : threads.discussionIds;
 
   const refreshDiscussions = async () => {
     await threads.reload();
     if (!alive()) {
       return;
     }
-    codeDiscussionIds = threads.threadsError ? undefined : threads.discussionIds;
+    codeDiscussionIds = threads.threadsError ? null : threads.discussionIds;
   };
+
+  if (threads.discussionsTruncated) {
+    showDiscussionsTruncationNotice(root);
+  }
+
+  ensureEntryStyles();
 
   const detach = attachEntries({
     root,
@@ -221,6 +326,7 @@ export async function init(overrides = {}) {
 
   return () => {
     isActive = false;
+    lastOpenContext = null;
     detach();
     drawer.close();
     runDetached("图标没能复位", reportInactive);

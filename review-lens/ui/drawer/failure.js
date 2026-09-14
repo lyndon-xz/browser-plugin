@@ -67,6 +67,7 @@ const UNKNOWN = {
   canUseToken: false,
 };
 
+/** 取数或构建失败时的说明与重试/配令牌出口 */
 export function renderFailure(request) {
   const { error, onRetry, onConfigureToken } = request;
 
