@@ -1,312 +1,93 @@
 import { extractRootDomain } from "../utils/domain.js";
-import { MESSAGE_ACTION } from "../utils/messages.js";
 import { StorageHelper } from "../utils/storage.js";
-import { applyURLToTab } from "../utils/tab.js";
-import {
-  PARAM_MODE,
-  buildURLWithParamRules,
-  buildURLWithoutConfig,
-  emptyDefaultToNull,
-  isSupportedURL,
-} from "../utils/url.js";
+import { isSupportedURL } from "../utils/url.js";
 
-import { PARAM_INDEX_ATTR, createDragSort } from "./drag.js";
-import {
-  DELETE_BTN_CLASS,
-  HIDDEN_CLASS,
-  PARAM_VALUE_CLASS,
-  startEditValue,
-} from "./edit-value.js";
-import { PARAM_INDEX_CLASS, startMoveToIndex } from "./move-to-index.js";
+import { bindAddParamForm } from "./params/add-param.js";
+import { createParamsRenderer } from "./params/render-params.js";
+import { createDirtyState } from "./save/dirty-state.js";
+import { createSaveConfig } from "./save/save-config.js";
 
 // 参数项结构：{ key, defaultValue, isNew }
-let params = [];
+const params = [];
 
 const paramsListEl = document.getElementById("paramsList");
 const addSection = document.getElementById("addSection");
 const stateBox = document.getElementById("stateBox");
 const stateTitle = document.getElementById("stateTitle");
 const stateDesc = document.getElementById("stateDesc");
-
-/*
- * 无参数、页面不支持、配置读取失败共用这一块占位说明，同一时刻只可能有一种。
- * 它顶替参数列表的位置，列表为空时连带把列表容器藏掉——否则空容器的 padding
- * 与下边框会在头部下面留一条空白带
- */
-function showState(stateText) {
-  const { title, desc } = stateText;
-
-  stateTitle.textContent = title;
-  stateDesc.textContent = desc;
-  stateBox.classList.remove(HIDDEN_CLASS);
-  paramsListEl.classList.add(HIDDEN_CLASS);
-}
-
-function hideState() {
-  stateBox.classList.add(HIDDEN_CLASS);
-  paramsListEl.classList.remove(HIDDEN_CLASS);
-}
-
-function moveParamToIndex(fromIndex, toIndex) {
-  if (fromIndex === toIndex) {
-    return;
-  }
-  if (toIndex < 0 || toIndex >= params.length) {
-    return;
-  }
-  const [moved] = params.splice(fromIndex, 1);
-  params.splice(toIndex, 0, moved);
-  renderParams();
-  scrollParamIntoView(toIndex);
-}
-
-function scrollParamIntoView(index) {
-  requestAnimationFrame(() => {
-    paramsListEl.children[index]?.scrollIntoView({ block: "nearest" });
-  });
-}
-
-const dragSort = createDragSort((fromIndex, dropIndex) => {
-  const insertAt = fromIndex < dropIndex ? dropIndex - 1 : dropIndex;
-  moveParamToIndex(fromIndex, insertAt);
-});
-
-function renderParams() {
-  paramsListEl.innerHTML = "";
-
-  if (params.length === 0) {
-    showState({
-      title: "当前 URL 没有查询参数",
-      desc: "可以手动新增，给参数设上默认值",
-    });
-    addSection.classList.remove(HIDDEN_CLASS);
-    return;
-  }
-
-  hideState();
-
-  params.forEach((param, index) => {
-    const { key: paramKey, defaultValue, isNew } = param;
-
-    const item = document.createElement("div");
-    item.className = "param-item";
-    item.dataset[PARAM_INDEX_ATTR] = index;
-
-    const indexLabel = document.createElement("span");
-    indexLabel.className = PARAM_INDEX_CLASS;
-    indexLabel.textContent = String(index + 1);
-    indexLabel.title = "点击输入目标位置";
-    indexLabel.addEventListener("click", () => {
-      startMoveToIndex({
-        item,
-        currentPosition: index + 1,
-        maxPosition: params.length,
-        onCommit: (targetPosition) => {
-          moveParamToIndex(index, targetPosition - 1);
-        },
-      });
-    });
-
-    const dragHandle = document.createElement("span");
-    dragHandle.className = "drag-handle";
-    dragHandle.textContent = "≡";
-    dragHandle.title = "拖动排序";
-
-    const key = document.createElement("span");
-    key.className = "param-key";
-    key.textContent = paramKey;
-    key.title = paramKey;
-
-    const value = document.createElement("span");
-    if (defaultValue == null) {
-      value.className = `${PARAM_VALUE_CLASS} empty`;
-      value.textContent = "—";
-    } else {
-      value.className = PARAM_VALUE_CLASS;
-      value.textContent = defaultValue;
-    }
-    value.addEventListener("click", () => {
-      startEditValue({
-        item,
-        initialValue: defaultValue,
-        onCommit: (newValue) => {
-          params[index].defaultValue = newValue;
-          renderParams();
-        },
-      });
-    });
-
-    const deleteBtn = document.createElement("span");
-    deleteBtn.className = DELETE_BTN_CLASS;
-    deleteBtn.textContent = "×";
-    deleteBtn.addEventListener("click", () => {
-      params.splice(index, 1);
-      renderParams();
-    });
-
-    item.appendChild(indexLabel);
-    item.appendChild(dragHandle);
-    item.appendChild(key);
-    item.appendChild(value);
-    item.appendChild(deleteBtn);
-
-    if (isNew) {
-      const badge = document.createElement("span");
-      badge.className = "new-badge";
-      badge.textContent = "新";
-      item.appendChild(badge);
-    }
-
-    dragSort.bindItem(item);
-    paramsListEl.appendChild(item);
-  });
-}
-
-const addBtn = document.getElementById("addBtn");
 const addForm = document.getElementById("addForm");
 const addKey = document.getElementById("addKey");
 const addValue = document.getElementById("addValue");
 const addConfirm = document.getElementById("addConfirm");
 const addCancel = document.getElementById("addCancel");
-// 参数名重复时红框停留的时长
-const KEY_ERROR_HINT_MS = 1000;
-
-addBtn.addEventListener("click", () => {
-  addSection.classList.add(HIDDEN_CLASS);
-  addForm.classList.remove(HIDDEN_CLASS);
-  addKey.value = "";
-  addValue.value = "";
-  addKey.focus();
-});
-
-addCancel.addEventListener("click", () => {
-  addForm.classList.add(HIDDEN_CLASS);
-  addSection.classList.remove(HIDDEN_CLASS);
-});
-
-addConfirm.addEventListener("click", () => {
-  const key = addKey.value.trim();
-  if (!key) {
-    addKey.focus();
-    return;
-  }
-
-  if (params.some((param) => param.key === key)) {
-    addKey.classList.add("error");
-    setTimeout(() => {
-      addKey.classList.remove("error");
-    }, KEY_ERROR_HINT_MS);
-    return;
-  }
-
-  params.unshift({
-    key,
-    defaultValue: emptyDefaultToNull(addValue.value.trim()),
-    isNew: true,
-  });
-
-  addForm.classList.add(HIDDEN_CLASS);
-  addSection.classList.remove(HIDDEN_CLASS);
-  renderParams();
-});
-
-addKey.addEventListener("keydown", (e) => {
-  const { key } = e;
-  if (key === "Enter") {
-    e.preventDefault();
-    addValue.focus();
-  }
-  if (key === "Escape") {
-    addCancel.click();
-  }
-});
-
-addValue.addEventListener("keydown", (e) => {
-  const { key } = e;
-  if (key === "Enter") {
-    e.preventDefault();
-    addConfirm.click();
-  }
-  if (key === "Escape") {
-    addCancel.click();
-  }
-});
-
-let currentTab = null;
-let rootDomain = "";
 const toggleEl = document.getElementById("toggle");
 const saveBtn = document.getElementById("saveBtn");
-const SAVE_FEEDBACK_MS = 1500;
-
-function showSaveResult(text, isSuccess) {
-  saveBtn.textContent = text;
-  saveBtn.classList.toggle("success", isSuccess);
-  saveBtn.classList.toggle("failed", !isSuccess);
-
-  setTimeout(() => {
-    saveBtn.textContent = "保存并应用";
-    saveBtn.classList.remove("success");
-    saveBtn.classList.remove("failed");
-  }, SAVE_FEEDBACK_MS);
-}
-
-async function saveConfig() {
-  if (!currentTab) {
-    return;
-  }
-  const { id: tabId, url } = currentTab;
-  const { checked: isEnabled } = toggleEl;
-  const config = {
-    isEnabled,
-    params: params.map((param) => {
-      const { key, defaultValue } = param;
-      return { key, defaultValue };
-    }),
-  };
-
-  try {
-    await StorageHelper.setConfig(rootDomain, config);
-
-    let appliedURL = url;
-    if (isEnabled) {
-      appliedURL = buildURLWithParamRules(
-        url,
-        config.params,
-        PARAM_MODE.configOnly,
-      );
-    } else {
-      appliedURL = buildURLWithoutConfig(url, config.params);
-    }
-    await applyURLToTab({ tabId, oldURL: url, newURL: appliedURL });
-
-    // background 据此只刷新图标；带上应用后的 URL，它就不必自己重算
-    await chrome.runtime.sendMessage({
-      action: MESSAGE_ACTION.configUpdated,
-      tabId,
-      url: appliedURL,
-    });
-  } catch (e) {
-    console.error("[search-sort] 保存配置失败：", e);
-    showSaveResult("保存失败，请重试", false);
-    return;
-  }
-
-  params = params.map((param) => ({ ...param, isNew: false }));
-  renderParams();
-  showSaveResult(isEnabled ? "✓ 已应用" : "✓ 已保存", true);
-}
-
-saveBtn.addEventListener("click", () => void saveConfig());
-
-// Switch 只是 UI 状态，随保存按钮一起写入 storage，不单独触发任何动作
-toggleEl.addEventListener("change", () => {
-  saveBtn.textContent = "保存并应用 •";
-});
-
+const saveHint = document.getElementById("saveHint");
 const popupEl = document.getElementById("popup");
 const domainEl = document.getElementById("domain");
 
-// 没有可配置对象时，参数区、新增区、保存按钮与开关一并由 CSS 收起，只留说明
+let currentTab = null;
+let rootDomain = "";
+
+const isTabGoneError = (error) =>
+  /No tab with id/i.test(error?.message ?? String(error));
+
+async function refreshCurrentTab() {
+  if (!currentTab?.id) {
+    return null;
+  }
+  try {
+    currentTab = await chrome.tabs.get(currentTab.id);
+    return currentTab;
+  } catch (e) {
+    if (isTabGoneError(e)) {
+      currentTab = null;
+      return null;
+    }
+    throw e;
+  }
+}
+
+const dirtyState = createDirtyState({
+  toggleEl,
+  saveBtn,
+  saveHint,
+  popupEl,
+  getParams: () => params,
+});
+
+const { renderParams, showState } = createParamsRenderer({
+  params,
+  elements: {
+    paramsListEl,
+    addSection,
+    stateBox,
+    stateTitle,
+    stateDesc,
+  },
+  onDirty: dirtyState.syncDirtyState,
+});
+
+bindAddParamForm({
+  params,
+  elements: { addSection, addForm, addKey, addValue, addConfirm, addCancel },
+  renderParams,
+  onDirty: dirtyState.syncDirtyState,
+});
+
+createSaveConfig({
+  saveBtn,
+  toggleEl,
+  getParams: () => params,
+  refreshCurrentTab,
+  getRootDomain: () => rootDomain,
+  renderParams,
+  adoptBaseline: dirtyState.adoptBaseline,
+});
+
+// Switch 只是 UI 状态，随保存按钮一起写入 storage，不单独触发任何动作
+toggleEl.addEventListener("change", dirtyState.syncDirtyState);
+
 function blockConfiguring(stateText) {
   popupEl.dataset.state = "blocked";
   showState(stateText);
@@ -352,15 +133,23 @@ async function init() {
     if (savedConfig) {
       const { isEnabled, params: savedParams } = savedConfig;
       toggleEl.checked = isEnabled;
-      params = savedParams.map((param) => ({
-        ...param,
-        isNew: false,
-      }));
+      params.splice(
+        0,
+        params.length,
+        ...savedParams.map((param) => ({ ...param, isNew: false })),
+      );
+      dirtyState.setBaselineFromSaved(savedConfig);
     }
 
-    params = mergeCurrentUrlParams(searchParams, params, savedConfig);
+    const merged = mergeCurrentUrlParams(searchParams, params, savedConfig);
+    params.splice(0, params.length, ...merged);
+
+    if (!savedConfig) {
+      dirtyState.setBaselineFromCurrent();
+    }
 
     renderParams();
+    dirtyState.syncDirtyState();
   } catch (e) {
     console.error("[search-sort] popup 初始化失败：", e);
     blockConfiguring({

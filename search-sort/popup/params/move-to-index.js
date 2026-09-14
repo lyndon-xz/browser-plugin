@@ -1,4 +1,4 @@
-import { HIDDEN_CLASS } from "./edit-value.js";
+import { HIDDEN_CLASS } from "../classes.js";
 
 /** popup.js 读写同一份：参数行序号标签的 class */
 export const PARAM_INDEX_CLASS = "param-index";

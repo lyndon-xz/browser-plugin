@@ -1,7 +1,6 @@
-import { emptyDefaultToNull } from "../utils/url.js";
+import { emptyDefaultToNull } from "../../utils/url.js";
+import { HIDDEN_CLASS } from "../classes.js";
 
-/** popup 隐藏态 class */
-export const HIDDEN_CLASS = "hidden";
 /** 参数默认值展示格 class */
 export const PARAM_VALUE_CLASS = "param-value";
 /** 参数行删除按钮 class */

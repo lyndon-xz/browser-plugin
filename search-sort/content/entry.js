@@ -17,12 +17,12 @@ function isCurrentSource(sourceURL) {
 
 function applySortedURL(sortedURL, sourceURL) {
   if (sortedURL === window.location.href) {
-    return;
+    return true;
   }
 
   // 消息在途期间页面可能已经改了查询串或跳走，此时这条重排结果已过期
   if (!isCurrentSource(sourceURL)) {
-    return;
+    return false;
   }
 
   isApplying = true;
@@ -32,20 +32,11 @@ function applySortedURL(sortedURL, sourceURL) {
    */
   window.history.replaceState(window.history.state, "", sortedURL);
   isApplying = false;
+  return true;
 }
 
 /** 监听 SPA 路由变化并接收 background 下发的原地 URL 替换 */
 export function init() {
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    const { action, url, sourceURL } = message;
-
-    if (action === MESSAGE_ACTION.apply) {
-      applySortedURL(url, sourceURL);
-      sendResponse();
-    }
-    return true;
-  });
-
   const originalPushState = history.pushState;
   const originalReplaceState = history.replaceState;
 
@@ -99,6 +90,20 @@ export function init() {
     );
   }
 
+  function onPopState() {
+    notifyURLChanged();
+  }
+
+  function onMessage(message, _sender, sendResponse) {
+    const { action, url, sourceURL } = message;
+
+    if (action === MESSAGE_ACTION.apply) {
+      const applied = applySortedURL(url, sourceURL);
+      sendResponse({ applied });
+    }
+    return true;
+  }
+
   history.pushState = function (...args) {
     originalPushState.apply(this, args);
     if (!isApplying) {
@@ -113,12 +118,12 @@ export function init() {
     }
   };
 
-  window.addEventListener("popstate", () => {
-    notifyURLChanged();
-  });
+  chrome.runtime.onMessage.addListener(onMessage);
+  window.addEventListener("popstate", onPopState);
 
   return () => {
+    chrome.runtime.onMessage.removeListener(onMessage);
+    window.removeEventListener("popstate", onPopState);
     releaseOrphanedScript();
-    window.removeEventListener("popstate", notifyURLChanged);
   };
 }

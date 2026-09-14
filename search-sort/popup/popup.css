@@ -22,6 +22,7 @@
   --switch-off: #ccc;
   --badge-bg: #fff3e0;
   --badge-text: #f57c00;
+  --badge-text-hover: #e65100;
   --font-mono: "SF Mono", "Fira Code", monospace;
 }
 
@@ -428,6 +429,14 @@ body {
   border-top: 1px solid var(--divider);
 }
 
+.save-hint {
+  margin-bottom: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--badge-text);
+  text-align: center;
+}
+
 .save-btn {
   width: 100%;
   padding: 12px;
@@ -443,6 +452,15 @@ body {
 
 .save-btn:hover {
   background: var(--primary-hover);
+}
+
+.save-btn.dirty {
+  background: var(--badge-text);
+  box-shadow: 0 0 0 2px var(--badge-bg);
+}
+
+.save-btn.dirty:hover {
+  background: var(--badge-text-hover);
 }
 
 .save-btn.success {

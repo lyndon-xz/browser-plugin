@@ -63,20 +63,23 @@ function isStillSourceURL(currentURL, sourceURL) {
 export async function applyURLToTab(urlUpdate) {
   const { tabId, oldURL, newURL } = urlUpdate;
   if (newURL === oldURL) {
-    return;
+    return { applied: true, reason: "unchanged" };
   }
 
   if (hasSameSearchParams(oldURL, newURL)) {
     try {
-      await chrome.tabs.sendMessage(tabId, {
+      const response = await chrome.tabs.sendMessage(tabId, {
         action: MESSAGE_ACTION.apply,
         url: newURL,
         sourceURL: oldURL,
       });
-      return;
+      if (response?.applied) {
+        return { applied: true, reason: "soft-update" };
+      }
+      return { applied: false, reason: "soft-update-skipped" };
     } catch (e) {
       if (isTabGoneError(e)) {
-        return;
+        return { applied: false, reason: "tab-gone" };
       }
       /*
        * content script 尚未就绪（首屏未注入完、或扩展刚更新），软更新走不通，
@@ -88,7 +91,7 @@ export async function applyURLToTab(urlUpdate) {
 
   if (shouldSkipNavigation(tabId, newURL)) {
     console.warn("[search-sort] 跳过导航以避免刷新循环：", newURL);
-    return;
+    return { applied: false, reason: "navigation-skipped" };
   }
 
   let tab;
@@ -96,19 +99,21 @@ export async function applyURLToTab(urlUpdate) {
     tab = await chrome.tabs.get(tabId);
   } catch (e) {
     if (isTabGoneError(e)) {
-      return;
+      return { applied: false, reason: "tab-gone" };
     }
     throw e;
   }
   if (!tab.url || !isStillSourceURL(tab.url, oldURL)) {
-    return;
+    return { applied: false, reason: "source-mismatch" };
   }
 
   try {
     await chrome.tabs.update(tabId, { url: newURL });
+    return { applied: true, reason: "hard-navigation" };
   } catch (e) {
-    if (!isTabGoneError(e)) {
-      throw e;
+    if (isTabGoneError(e)) {
+      return { applied: false, reason: "tab-gone" };
     }
+    throw e;
   }
 }

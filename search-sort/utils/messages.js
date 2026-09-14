@@ -7,12 +7,3 @@ export const MESSAGE_ACTION = {
   // popup → background：配置已保存，据此刷新图标
   configUpdated: "configUpdated",
 };
-
-/** 统一的调用口：service worker 回传的失败在这里还原成异常，调用点不必各写一遍 isOk 判断 */
-export async function ask(action, payload = {}) {
-  const reply = await chrome.runtime.sendMessage({ action, ...payload });
-  if (!reply?.isOk) {
-    throw new Error(reply?.error ?? "扩展后台没有响应");
-  }
-  return reply.result;
-}
