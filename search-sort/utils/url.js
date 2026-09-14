@@ -1,4 +1,4 @@
-/*
+/**
  * 参数处理模式，决定配置外的现有参数怎么办：
  * - configOnly：以配置为准，剔除配置外的参数（popup 保存时用）
  * - keepExtra：保留配置外的参数，只做排序与默认值注入（自动应用时用）
@@ -8,10 +8,12 @@ export const PARAM_MODE = {
   keepExtra: "keep-extra",
 };
 
+/** 仅 http(s) 页面可配置查询参数 */
 export function isSupportedURL(url) {
   return Boolean(url) && url.startsWith("http");
 }
 
+/** popup 里空串默认值视为未设置 */
 export function emptyDefaultToNull(value) {
   return value === "" ? null : value;
 }
@@ -64,6 +66,7 @@ function applyParamRules(currentParams, configParams, mode) {
   return sorted;
 }
 
+/** 按配置顺序重排参数，并按 mode 决定是否保留配置外的现有参数 */
 export function buildURLWithParamRules(url, configParams, mode) {
   const urlObj = new URL(url);
   urlObj.search = applyParamRules(
@@ -74,7 +77,7 @@ export function buildURLWithParamRules(url, configParams, mode) {
   return urlObj.toString();
 }
 
-// 禁用时去掉配置注入的默认值，只保留 URL 上已有的参数
+/** 禁用时去掉配置注入的默认值，只保留 URL 上已有的参数 */
 export function buildURLWithoutConfig(url, configParams) {
   const urlObj = new URL(url);
   const existingKeys = new Set(urlObj.searchParams.keys());

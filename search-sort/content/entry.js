@@ -1,4 +1,4 @@
-import { MESSAGE_ACTION } from "../utils/message.js";
+import { MESSAGE_ACTION } from "../utils/messages.js";
 import { hasSameSearchParams } from "../utils/url.js";
 
 let isApplying = false;
@@ -34,6 +34,7 @@ function applySortedURL(sortedURL, sourceURL) {
   isApplying = false;
 }
 
+/** 监听 SPA 路由变化并接收 background 下发的原地 URL 替换 */
 export function init() {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     const { action, url, sourceURL } = message;
@@ -77,9 +78,9 @@ export function init() {
     } catch (e) {
       if (isOrphanedError(e)) {
         releaseOrphanedScript();
-        console.warn("content script orphaned, stop reporting:", e);
+        console.warn("[search-sort] content script 已失效，停止上报：", e);
       } else {
-        console.warn("urlChanged message failed:", e);
+        console.warn("[search-sort] urlChanged 消息失败：", e);
       }
     }
   }

@@ -1,13 +1,11 @@
 import { HIDDEN_CLASS } from "./edit-value.js";
 
+/** popup.js 读写同一份：参数行序号标签的 class */
 export const PARAM_INDEX_CLASS = "param-index";
 
 const INVALID_HINT_MS = 600;
 
-/*
- * 序号行内编辑：点击序号输入目标位置（1 起），回车或失焦提交、Esc 取消。
- * 非法输入或位置不变时不回调 onCommit。
- */
+/** 序号行内编辑：点击序号输入目标位置（1 起），回车或失焦提交、Esc 取消 */
 export function startMoveToIndex(request) {
   const { item, currentPosition, maxPosition, onCommit } = request;
 

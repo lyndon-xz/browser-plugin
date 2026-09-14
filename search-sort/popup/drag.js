@@ -1,7 +1,7 @@
-// popup.js 读写同一份：列表项在参数数组里的序号
+/** popup.js 读写同一份：列表项在参数数组里的序号 */
 export const PARAM_INDEX_ATTR = "index";
 
-// 参数列表的拖拽排序：只管拖拽交互与索引计算，列表本身由调用方通过 onReorder 改
+/** 参数列表拖拽排序；索引计算在这里，列表数据由 onReorder 改 */
 export function createDragSort(onReorder) {
   let dragIndex = null;
 

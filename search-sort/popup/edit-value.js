@@ -1,15 +1,13 @@
 import { emptyDefaultToNull } from "../utils/url.js";
 
-/*
- * 默认值的行内编辑：把 .param-value 换成输入框，回车或失焦提交、Esc 取消。
- * 空串归一为 null 后经 onCommit 交回调用方，本模块不碰参数列表
- */
-
-// popup.js 共用这些 class：行内编辑与参数行两侧靠同一份契约
+/** popup 隐藏态 class */
 export const HIDDEN_CLASS = "hidden";
+/** 参数默认值展示格 class */
 export const PARAM_VALUE_CLASS = "param-value";
+/** 参数行删除按钮 class */
 export const DELETE_BTN_CLASS = "delete-btn";
 
+/** 默认值的行内编辑：回车或失焦提交，Esc 取消；空串归一为 null */
 export function startEditValue(editRequest) {
   const { item, initialValue, onCommit } = editRequest;
 

@@ -1,5 +1,5 @@
 import { extractRootDomain } from "../utils/domain.js";
-import { MESSAGE_ACTION } from "../utils/message.js";
+import { MESSAGE_ACTION } from "../utils/messages.js";
 import { StorageHelper } from "../utils/storage.js";
 import { applyURLToTab } from "../utils/tab.js";
 import {
@@ -17,10 +17,7 @@ import {
   PARAM_VALUE_CLASS,
   startEditValue,
 } from "./edit-value.js";
-import {
-  PARAM_INDEX_CLASS,
-  startMoveToIndex,
-} from "./move-to-index.js";
+import { PARAM_INDEX_CLASS, startMoveToIndex } from "./move-to-index.js";
 
 // 参数项结构：{ key, defaultValue, isNew }
 let params = [];
@@ -289,7 +286,7 @@ async function saveConfig() {
       url: appliedURL,
     });
   } catch (e) {
-    console.error("saveConfig failed:", e);
+    console.error("[search-sort] 保存配置失败：", e);
     showSaveResult("保存失败，请重试", false);
     return;
   }
@@ -365,7 +362,7 @@ async function init() {
 
     renderParams();
   } catch (e) {
-    console.error("popup init failed:", e);
+    console.error("[search-sort] popup 初始化失败：", e);
     blockConfiguring({
       title: "读取配置失败",
       desc: "关掉弹窗重新打开试试",

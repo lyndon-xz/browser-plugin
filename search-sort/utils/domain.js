@@ -51,6 +51,7 @@ function isIpHost(hostname) {
   return parts.length === 4 && parts.every((part) => /^\d+$/.test(part));
 }
 
+/** 从 hostname 提取配置键（根域名；IP 主机用完整 hostname） */
 export function extractRootDomain(hostname) {
   const host = hostname.toLowerCase();
   if (isIpHost(host)) {

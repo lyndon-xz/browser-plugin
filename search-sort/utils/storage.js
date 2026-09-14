@@ -26,6 +26,7 @@ function toStored(config) {
   };
 }
 
+/** 按根域名读写 URL 参数排序配置（chrome.storage.local） */
 export const StorageHelper = {
   async getConfig(rootDomain) {
     const configs = await readConfigs();

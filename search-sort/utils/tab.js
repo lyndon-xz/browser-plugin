@@ -1,10 +1,18 @@
-import { MESSAGE_ACTION } from "./message.js";
+import { MESSAGE_ACTION } from "./messages.js";
 import { hasSameSearchParams } from "./url.js";
 
 /*
  * 标签页操作相关工具。依赖 chrome.tabs，仅供 background / popup 使用，
  * 不应注入到内容脚本（content script）环境。
  */
+
+const isTabGoneError = (error) =>
+  /No tab with id/i.test(error?.message ?? String(error));
+
+/** tab 关闭时清掉导航计数，避免 Map 泄漏 */
+export function forgetTab(tabId) {
+  navigationAttempts.delete(tabId);
+}
 
 /*
  * 站点若在服务端把注入的默认值重定向掉，会与本扩展形成
@@ -46,11 +54,11 @@ function isStillSourceURL(currentURL, sourceURL) {
   return currentURL === sourceURL || hasSameSearchParams(currentURL, sourceURL);
 }
 
-/*
- * 把排序后的 URL 应用到指定标签页：
- * - 与原 URL 相同：不处理
- * - 仅参数顺序变化：通知 content script 原地软更新（replaceState）
- * - 实质变化（注入默认值/增删参数）：整页刷新
+/**
+ * 把重排后的 URL 应用到指定标签页。分支看查询参数多重集是否相同（hasSameSearchParams）：
+ * - 字符串完全相同：不处理
+ * - 多重集相同：content script replaceState；sendMessage 失败时降级 tabs.update
+ * - 多重集不同：tabs.update 整页导航
  */
 export async function applyURLToTab(urlUpdate) {
   const { tabId, oldURL, newURL } = urlUpdate;
@@ -67,23 +75,40 @@ export async function applyURLToTab(urlUpdate) {
       });
       return;
     } catch (e) {
+      if (isTabGoneError(e)) {
+        return;
+      }
       /*
        * content script 尚未就绪（首屏未注入完、或扩展刚更新），软更新走不通，
        * 降级为整页导航，保证重排至少能生效
        */
-      console.warn("sendMessage failed, fall back to navigation:", e);
+      console.warn("[search-sort] sendMessage 失败，降级整页导航：", e);
     }
   }
 
   if (shouldSkipNavigation(tabId, newURL)) {
-    console.warn("navigation skipped to avoid reload loop:", newURL);
+    console.warn("[search-sort] 跳过导航以避免刷新循环：", newURL);
     return;
   }
 
-  const tab = await chrome.tabs.get(tabId);
+  let tab;
+  try {
+    tab = await chrome.tabs.get(tabId);
+  } catch (e) {
+    if (isTabGoneError(e)) {
+      return;
+    }
+    throw e;
+  }
   if (!tab.url || !isStillSourceURL(tab.url, oldURL)) {
     return;
   }
 
-  await chrome.tabs.update(tabId, { url: newURL });
+  try {
+    await chrome.tabs.update(tabId, { url: newURL });
+  } catch (e) {
+    if (!isTabGoneError(e)) {
+      throw e;
+    }
+  }
 }

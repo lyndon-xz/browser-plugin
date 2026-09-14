@@ -18,12 +18,39 @@
     }
   };
 
-  void (async () => {
-    try {
-      const entry = await load("content/entry.js");
-      entry?.init();
-    } catch (error) {
-      report(error);
+  let teardown = null;
+
+  function unmount() {
+    teardown?.();
+    teardown = null;
+  }
+
+  function mount() {
+    void (async () => {
+      try {
+        const entry = await load("content/entry.js");
+        const result = entry?.init();
+        if (typeof result === "function") {
+          teardown = result;
+        }
+      } catch (error) {
+        report(error);
+      }
+    })();
+  }
+
+  window.addEventListener("pagehide", (event) => {
+    if (!event.persisted) {
+      unmount();
     }
-  })();
+  });
+
+  window.addEventListener("pageshow", (event) => {
+    // bfcache 恢复时脚本通常仍在；仅 teardown 已释放时才重挂
+    if (event.persisted && !teardown) {
+      mount();
+    }
+  });
+
+  mount();
 })();

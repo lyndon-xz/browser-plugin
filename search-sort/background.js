@@ -1,12 +1,18 @@
 import { extractRootDomain } from "./utils/domain.js";
-import { MESSAGE_ACTION } from "./utils/message.js";
+import { MESSAGE_ACTION } from "./utils/messages.js";
 import { StorageHelper } from "./utils/storage.js";
-import { applyURLToTab } from "./utils/tab.js";
+import { applyURLToTab, forgetTab } from "./utils/tab.js";
 import {
   PARAM_MODE,
   buildURLWithParamRules,
+  buildURLWithoutConfig,
   isSupportedURL,
 } from "./utils/url.js";
+
+/*
+ * service worker 负责 popup / content script 做不到的事：读 storage、按域名配置
+ * 重排 URL、更新标签页图标，并串行化同一 tab 上的并发应用。
+ */
 
 const ICON_SIZES = [16, 32, 48, 128];
 
@@ -26,8 +32,17 @@ const ICONS = {
   [ICON_STATE.inactive]: buildIconSet(ICON_STATE.inactive),
 };
 
-function updateIcon(tabId, state) {
-  return chrome.action.setIcon({ path: ICONS[state], tabId });
+const isTabGoneError = (error) =>
+  /No tab with id/i.test(error?.message ?? String(error));
+
+async function updateIcon(tabId, state) {
+  try {
+    await chrome.action.setIcon({ path: ICONS[state], tabId });
+  } catch (error) {
+    if (!isTabGoneError(error)) {
+      throw error;
+    }
+  }
 }
 
 function readConfigForURL(url) {
@@ -58,12 +73,9 @@ async function applyConfigToTab(tabId, url) {
     }
 
     const { isEnabled, params } = config;
-    if (!isEnabled) {
-      await updateIcon(tabId, ICON_STATE.inactive);
-      return;
-    }
-
-    const newURL = buildURLWithParamRules(url, params, PARAM_MODE.keepExtra);
+    const newURL = isEnabled
+      ? buildURLWithParamRules(url, params, PARAM_MODE.keepExtra)
+      : buildURLWithoutConfig(url, params);
 
     if (applyGeneration.get(tabId) !== generation) {
       return;
@@ -75,10 +87,12 @@ async function applyConfigToTab(tabId, url) {
       return;
     }
 
-    await updateIcon(tabId, ICON_STATE.active);
+    await updateIcon(
+      tabId,
+      isEnabled ? ICON_STATE.active : ICON_STATE.inactive,
+    );
   } catch (e) {
-    // URL 不合法或标签页尚未就绪，属预期忽略路径，仅记录便于排查
-    console.warn("applyConfigToTab skipped:", e);
+    console.warn("[search-sort] 应用配置跳过：", e);
   }
 }
 
@@ -98,9 +112,20 @@ async function updateIconForTab(tabId, url) {
       config?.isEnabled ? ICON_STATE.active : ICON_STATE.inactive,
     );
   } catch (e) {
-    console.warn("updateIconForTab skipped:", e);
+    console.warn("[search-sort] 刷新图标跳过：", e);
   }
 }
+
+const HANDLERS = {
+  [MESSAGE_ACTION.urlChanged]: (message, sender) => {
+    if (sender.tab) {
+      void applyConfigToTab(sender.tab.id, message.url);
+    }
+  },
+  [MESSAGE_ACTION.configUpdated]: (message) => {
+    void updateIconForTab(message.tabId, message.url);
+  },
+};
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
@@ -108,13 +133,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-chrome.runtime.onMessage.addListener((message, sender) => {
-  const { action, url, tabId } = message;
+chrome.tabs.onRemoved.addListener((tabId) => {
+  applyGeneration.delete(tabId);
+  forgetTab(tabId);
+});
 
-  if (action === MESSAGE_ACTION.urlChanged && sender.tab) {
-    void applyConfigToTab(sender.tab.id, url);
-  }
-  if (action === MESSAGE_ACTION.configUpdated && tabId) {
-    void updateIconForTab(tabId, url);
+chrome.runtime.onMessage.addListener((message, sender) => {
+  const handler = HANDLERS[message?.action];
+  if (handler) {
+    handler(message, sender);
   }
 });

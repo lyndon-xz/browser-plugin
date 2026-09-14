@@ -1,40 +1,41 @@
 {
   "manifest_version": 3,
-  "name": "Search Params Sorter",
+  "name": "search-sort",
   "version": "2.1.0",
-  "description": "Sort URL search params and set defaults for any website",
+  "description": "对任意网站的 URL 查询参数排序，并设置默认值",
   "icons": {
     "16": "icons/active/icon-16.png",
     "32": "icons/active/icon-32.png",
     "48": "icons/active/icon-48.png",
     "128": "icons/active/icon-128.png"
   },
-  "permissions": ["activeTab", "storage"],
+  "permissions": ["storage", "activeTab"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
-  "web_accessible_resources": [
-    {
-      "resources": ["content/*.js", "utils/*.js"],
-      "matches": ["<all_urls>"]
-    }
-  ],
   "action": {
-    "default_popup": "popup/popup.html",
+    "default_title": "search-sort",
     "default_icon": {
       "16": "icons/inactive/icon-16.png",
       "32": "icons/inactive/icon-32.png",
       "48": "icons/inactive/icon-48.png",
       "128": "icons/inactive/icon-128.png"
-    }
+    },
+    "default_popup": "popup/popup.html"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["content/bootstrap.js"],
       "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content/*.js", "utils/*.js"],
+      "matches": ["<all_urls>"]
     }
   ]
 }
