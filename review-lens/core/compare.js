@@ -124,9 +124,24 @@ export function resliceComparePair(cache, extraLines = 0) {
     };
   }
 
-  if (state === COMPARE_STATE.changed && newLines && locatedAnchorLine != null) {
-    const now = sliceForReading(newLines, locatedAnchorLine, { extraLines, path });
-    return { state, then, now, commits, commitsTruncated, commitsFetchFailed, diffOps };
+  if (
+    state === COMPARE_STATE.changed &&
+    newLines &&
+    locatedAnchorLine != null
+  ) {
+    const now = sliceForReading(newLines, locatedAnchorLine, {
+      extraLines,
+      path,
+    });
+    return {
+      state,
+      then,
+      now,
+      commits,
+      commitsTruncated,
+      commitsFetchFailed,
+      diffOps,
+    };
   }
 
   if (state === COMPARE_STATE.unchanged) {
@@ -193,12 +208,15 @@ export async function buildComparePair(client, request) {
 
   // 三种结局里有两种要它，参数每次都一样
   const touchedSinceComment = async () => {
-    const { commits, isTruncated, fetchFailed } = await commitsTouchedSince(client, {
-      project,
-      path,
-      branch: sourceBranch,
-      since: createdAt,
-    });
+    const { commits, isTruncated, fetchFailed } = await commitsTouchedSince(
+      client,
+      {
+        project,
+        path,
+        branch: sourceBranch,
+        since: createdAt,
+      },
+    );
     return {
       commits,
       commitsTruncated: isTruncated,

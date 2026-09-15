@@ -44,7 +44,9 @@ function languageFromPath(path) {
 const codeBlock = (code, path) => {
   const rail = fence(code);
   const lang = languageFromPath(path);
-  return lang ? `${rail}${lang}\n${code}\n${rail}` : `${rail}\n${code}\n${rail}`;
+  return lang
+    ? `${rail}${lang}\n${code}\n${rail}`
+    : `${rail}\n${code}\n${rail}`;
 };
 
 function nowSection(card) {
