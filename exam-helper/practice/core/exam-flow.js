@@ -274,7 +274,7 @@ export async function submitExam(isAuto) {
 
   showResultSummary();
   showPanel(ui.resultPanel);
-  renderReview();
+  renderReview("wrong");
 }
 
 export async function discardSession() {

@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>exam-helper · L2 模拟考</title>
+    <title>exam-helper · 模拟练习</title>
     <link rel="stylesheet" href="practice.css" />
   </head>
   <body>
     <div class="page">
       <header class="top">
         <div>
-          <h1>阿里巴巴编码规范 L2 练习</h1>
-          <p class="sub" id="mode-sub">模拟考 · 快刷 · 错题本</p>
+          <h1>模拟练习</h1>
+          <p class="sub" id="mode-sub">选择模式开始</p>
           <p class="bank-stats" id="bank-stats"></p>
           <p class="material-stats" id="material-stats"></p>
           <p class="coverage-stats" id="coverage-stats" hidden></p>
@@ -117,11 +117,17 @@
               返回选模式
             </button>
             <button type="button" class="btn" id="review-btn">只看错题</button>
+            <button type="button" class="btn" id="full-review-btn">
+              查看整卷
+            </button>
             <button type="button" class="btn" id="wrong-btn">去练错题本</button>
           </div>
         </div>
         <div class="card" id="review-wrap" hidden>
-          <h2 class="review-title">错题回顾</h2>
+          <div class="review-head">
+            <h2 class="review-title" id="review-title">错题回顾</h2>
+            <p class="review-meta" id="review-meta"></p>
+          </div>
           <div id="review-list"></div>
         </div>
       </section>

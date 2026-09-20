@@ -1,5 +1,6 @@
 /** 练习页入口：绑定事件并展示起始面板 */
 import "../../content/assist/page-assist.js";
+import { DEFAULT_SCENARIO_ID, getScenario } from "../../data/scenarios.js";
 import { EXAM_MODES } from "../core/constants.js";
 import {
   discardSession,
@@ -21,6 +22,23 @@ import {
   renderReview,
 } from "../ui/render-panels.js";
 import { renderQuestion } from "../ui/render-question.js";
+
+function applyScenarioFromUrl() {
+  const scenarioId =
+    new URLSearchParams(location.search).get("scenario") || DEFAULT_SCENARIO_ID;
+  const scenario = getScenario(scenarioId);
+  document.title = `exam-helper · ${scenario.label}`;
+  const heading = document.querySelector(".top h1");
+  const sub = document.getElementById("mode-sub");
+  if (heading) {
+    heading.textContent = `${scenario.label} 练习`;
+  }
+  if (sub) {
+    sub.textContent = scenario.summary;
+  }
+}
+
+applyScenarioFromUrl();
 
 exam.currentMode = EXAM_MODES.l2;
 exam.passThreshold = EXAM_MODES.l2.passCorrect;
@@ -68,7 +86,13 @@ document.getElementById("retry-btn").addEventListener("click", () => {
   });
 });
 
-document.getElementById("review-btn").addEventListener("click", renderReview);
+document.getElementById("review-btn").addEventListener("click", () => {
+  renderReview("wrong");
+});
+
+document.getElementById("full-review-btn").addEventListener("click", () => {
+  renderReview("all");
+});
 
 document.getElementById("wrong-btn").addEventListener("click", () => {
   void startMode("wrong");

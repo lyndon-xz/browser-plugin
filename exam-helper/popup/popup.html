@@ -9,13 +9,23 @@
     <div class="wrap">
       <header class="top">
         <h1>exam-helper</h1>
-        <div class="power" id="status" role="group" aria-label="划词助手">
+        <div
+          class="power off is-loading"
+          id="status"
+          role="group"
+          aria-label="划词助手"
+        >
           <div class="power-main">
             <span class="power-dot" aria-hidden="true"></span>
             <span class="power-label" id="status-text">读取中…</span>
           </div>
           <label class="switch">
-            <input type="checkbox" id="toggle" aria-label="启用划词助手" />
+            <input
+              type="checkbox"
+              id="toggle"
+              aria-label="启用划词助手"
+              disabled
+            />
             <span class="switch-track" aria-hidden="true"></span>
           </label>
         </div>
@@ -41,12 +51,31 @@
           </div>
         </div>
         <p class="card-desc">
-          划词：📚 答案匹配 或 🤖 AI 推理。L2 练习：题库组卷 / AI
+          划词：📚 答案匹配 或 🤖 AI 推理。模拟练习支持题库组卷 / AI
           组卷（后者需下方密钥）。
         </p>
+        <label class="row-label" for="scenario-picker-btn">练习场景</label>
+        <div class="picker" id="scenario-picker">
+          <button
+            type="button"
+            class="picker-btn"
+            id="scenario-picker-btn"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+          >
+            <span class="picker-value" id="scenario-picker-value">—</span>
+            <span class="picker-chevron" aria-hidden="true"></span>
+          </button>
+          <ul
+            class="picker-menu"
+            id="scenario-picker-menu"
+            role="listbox"
+            hidden
+          ></ul>
+        </div>
         <div class="btn-pair">
           <button type="button" id="open-fixture" class="btn">验收页</button>
-          <button type="button" id="open-practice" class="btn">L2 练习</button>
+          <button type="button" id="open-practice" class="btn">打开练习</button>
         </div>
       </section>
 

@@ -1,6 +1,11 @@
 import { EXAM_BANK } from "../../data/exam-bank.js";
 import { EXAM_MODES, PAPER_SOURCE } from "../core/constants.js";
-import { formatDuration, getBankStats } from "../core/engine.js";
+import {
+  formatDuration,
+  getBankStats,
+  getDisplayOptions,
+  orderedOptionKeys,
+} from "../core/engine.js";
 
 const EXAM_QUESTIONS = EXAM_BANK.questions;
 import {
@@ -79,35 +84,116 @@ export async function refreshStartPanel() {
   }
 }
 
-/** 错题回顾列表 */
-export function renderReview() {
+let reviewScope = "wrong";
+
+function syncReviewActionButtons() {
+  ui.reviewBtn?.classList.toggle("is-active", reviewScope === "wrong");
+  ui.fullReviewBtn?.classList.toggle("is-active", reviewScope === "all");
+}
+
+function renderReviewOptions(question, optionKeys, selected, isCorrect) {
+  const correctSet = new Set(question.answer || []);
+  const selectedSet = new Set(selected);
+  const keys =
+    optionKeys?.length > 0 ? optionKeys : orderedOptionKeys(question);
+  const displayOptions = getDisplayOptions(question, keys);
+
+  if (!displayOptions.length) {
+    return "";
+  }
+
+  const rows = displayOptions
+    .map((option) => {
+      const isCorrectOption = correctSet.has(option.key);
+      const isPicked = selectedSet.has(option.key);
+      const classes = ["review-option"];
+      if (isPicked && isCorrectOption) {
+        classes.push("is-pick-correct");
+      } else if (isPicked && !isCorrectOption) {
+        classes.push("is-pick-wrong");
+      } else if (!isPicked && isCorrectOption && !isCorrect) {
+        classes.push("is-correct-missed");
+      }
+      return `<li class="${classes.join(" ")}"><span class="review-option-key">${escapeHtml(option.key)}.</span>${escapeHtml(option.text)}</li>`;
+    })
+    .join("");
+
+  return `<ul class="review-options">${rows}</ul>`;
+}
+
+function renderReviewItem(item, { showStatus } = { showStatus: false }) {
+  const { index, question, optionKeys, selected, isCorrect } = item;
+  const correct = (question.answer || []).join(" ");
+  const yours = selected.length ? selected.join(" ") : "未作答";
+  const typeLabel = question.type === "single" ? "单选" : "多选";
+  const optionsHtml = renderReviewOptions(
+    question,
+    optionKeys,
+    selected,
+    isCorrect,
+  );
+  const explain = question.explain
+    ? `<div class="review-explain">${escapeHtml(formatExplain(question.explain))}</div>`
+    : "";
+  const statusHtml = showStatus
+    ? `<span class="review-status ${isCorrect ? "is-pass" : "is-fail"}">${isCorrect ? "答对" : "答错"}</span>`
+    : "";
+
+  return `
+    <article class="review-item ${isCorrect ? "is-correct" : "is-wrong"}">
+      <div class="review-q-row">
+        <div class="review-q">${index + 1}. ${escapeHtml(question.title)}</div>
+        ${statusHtml}
+      </div>
+      <div class="review-type-tag">${typeLabel}</div>
+      ${optionsHtml}
+      <div class="review-answer-block">
+        <div class="review-ans">你的答案：<span class="${isCorrect ? "is-yours-ok" : "wrong"}">${escapeHtml(yours)}</span></div>
+        <div class="review-ans">正确答案：<strong>${escapeHtml(correct)}</strong></div>
+      </div>
+      ${explain}
+    </article>
+  `;
+}
+
+/** 交卷后回顾：wrong 仅错题，all 整卷 */
+export function renderReview(scope = reviewScope) {
   if (!exam.lastResult) {
     return;
   }
-  const items = exam.lastResult.items.filter((item) => !item.isCorrect);
 
-  if (!items.length) {
-    ui.reviewList.innerHTML = '<p class="review-ans">全部答对，没有错题。</p>';
+  reviewScope = scope;
+  syncReviewActionButtons();
+
+  const { items, correctCount, total } = exam.lastResult;
+  const visibleItems =
+    reviewScope === "all" ? items : items.filter((item) => !item.isCorrect);
+
+  if (ui.reviewTitleEl) {
+    ui.reviewTitleEl.textContent =
+      reviewScope === "all" ? "整卷回顾" : "错题回顾";
+  }
+  if (ui.reviewMetaEl) {
+    ui.reviewMetaEl.textContent =
+      reviewScope === "all"
+        ? `共 ${total} 题 · 答对 ${correctCount} · 答错 ${total - correctCount}`
+        : visibleItems.length > 0
+          ? `共 ${visibleItems.length} 道错题`
+          : "全部答对";
+  }
+
+  if (!visibleItems.length) {
+    ui.reviewList.innerHTML =
+      '<p class="review-empty">全部答对，没有错题。</p>';
     ui.reviewWrap.hidden = false;
+    ui.reviewWrap.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
 
-  ui.reviewList.innerHTML = items
-    .map(({ index, question, selected }) => {
-      const correct = (question.answer || []).join(" ");
-      const yours = selected.length ? selected.join(" ") : "未作答";
-      const explain = question.explain
-        ? `<div class="review-ans">${escapeHtml(formatExplain(question.explain))}</div>`
-        : "";
-      return `
-        <article class="review-item">
-          <div class="review-q">${index + 1}. ${escapeHtml(question.title)}</div>
-          <div class="review-ans">你的答案：<span class="wrong">${escapeHtml(yours)}</span></div>
-          <div class="review-ans">正确答案：<strong>${escapeHtml(correct)}</strong></div>
-          ${explain}
-        </article>
-      `;
-    })
+  ui.reviewList.innerHTML = visibleItems
+    .map((item) =>
+      renderReviewItem(item, { showStatus: reviewScope === "all" }),
+    )
     .join("");
   ui.reviewWrap.hidden = false;
   ui.reviewWrap.scrollIntoView({ behavior: "smooth", block: "start" });

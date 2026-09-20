@@ -46,6 +46,11 @@ body {
     background 0.2s ease;
 }
 
+.power.is-loading .switch-track,
+.power.is-loading .switch-track::after {
+  transition: none;
+}
+
 .power:not(.off) {
   border-color: rgba(47, 111, 88, 0.16);
   background: linear-gradient(145deg, #fcfefd 0%, #f2f8f5 100%);

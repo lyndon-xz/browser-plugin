@@ -3,6 +3,7 @@
 export const STORAGE_KEYS = {
   enabled: "enabled",
   apiKey: "deepseekApiKey",
+  practiceScenario: "practiceScenarioId",
 };
 
 const DEFAULT_ENABLED = false;
@@ -54,6 +55,30 @@ export const StorageHelper = {
     if (!hasLocalStorage()) return;
     const trimmed = String(key == null ? "" : key).trim();
     await chrome.storage.local.set({ [STORAGE_KEYS.apiKey]: trimmed });
+  },
+
+  /** 读取 popup 选中的练习场景 id。 */
+  async getPracticeScenario(defaultId = "") {
+    try {
+      if (!hasLocalStorage()) return defaultId;
+      const result = await chrome.storage.local.get(
+        STORAGE_KEYS.practiceScenario,
+      );
+      const value = result?.[STORAGE_KEYS.practiceScenario];
+      return typeof value === "string" && value.trim()
+        ? value.trim()
+        : defaultId;
+    } catch (e) {
+      return defaultId;
+    }
+  },
+
+  /** 写入 popup 选中的练习场景 id。 */
+  async setPracticeScenario(id) {
+    if (!hasLocalStorage()) return;
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.practiceScenario]: String(id ?? "").trim(),
+    });
   },
 };
 

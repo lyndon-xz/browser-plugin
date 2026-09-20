@@ -122,12 +122,13 @@ export function isAnswerCorrect(question, selectedKeys) {
 
 /** 批改整卷；passCorrect 默认按 L2 40 题，快刷等模式传入各自阈值 */
 export function gradePaper(paper, answersByQuestionId, passCorrect) {
-  const items = paper.map(({ question, index }) => {
+  const items = paper.map(({ question, index, optionKeys }) => {
     const selected = answersByQuestionId.get(question.id) || [];
     const isCorrect = isAnswerCorrect(question, selected);
     return {
       index,
       question,
+      optionKeys,
       selected: normalizeSelection(selected),
       isCorrect,
     };

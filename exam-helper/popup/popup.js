@@ -1,4 +1,9 @@
-/** 弹窗：展示启用状态，读写本机 DeepSeek API 密钥。 */
+/** 弹窗：划词开关、练习场景选择、DeepSeek 密钥。 */
+import {
+  DEFAULT_SCENARIO_ID,
+  PRACTICE_SCENARIOS,
+  getScenario,
+} from "../data/scenarios.js";
 import {
   StorageHelper,
   STORAGE_KEYS,
@@ -12,8 +17,13 @@ const input = document.getElementById("key");
 const save = document.getElementById("save");
 const well = document.getElementById("well");
 const meta = document.getElementById("meta");
+const scenarioPickerBtn = document.getElementById("scenario-picker-btn");
+const scenarioPickerValue = document.getElementById("scenario-picker-value");
+const scenarioPickerMenu = document.getElementById("scenario-picker-menu");
 
 let enabled = false;
+let statusHydrated = false;
+let selectedScenarioId = DEFAULT_SCENARIO_ID;
 
 function maskTail(key) {
   const tail = String(key).slice(-4);
@@ -26,6 +36,14 @@ function renderEnabled(next) {
   powerEl.classList.remove("is-error");
   statusText.textContent = enabled ? "已启用" : "未启用";
   toggleInput.checked = enabled;
+
+  if (!statusHydrated) {
+    statusHydrated = true;
+    toggleInput.disabled = false;
+    requestAnimationFrame(() => {
+      powerEl.classList.remove("is-loading");
+    });
+  }
 }
 
 function renderKey(key) {
@@ -38,6 +56,27 @@ function renderKey(key) {
     meta.classList.remove("ok");
     meta.textContent = "未配置 — 匹配不到时将无法 AI 推理";
   }
+}
+
+function renderScenarioPicker() {
+  const scenario = getScenario(selectedScenarioId);
+  scenarioPickerValue.textContent = scenario.label;
+  scenarioPickerMenu.innerHTML = PRACTICE_SCENARIOS.map((item) => {
+    const active = item.id === selectedScenarioId;
+    return `<li role="option" data-id="${item.id}" class="${active ? "is-active" : ""}" aria-selected="${active}">${item.label}</li>`;
+  }).join("");
+}
+
+function closeScenarioPicker() {
+  scenarioPickerMenu.hidden = true;
+  scenarioPickerBtn.setAttribute("aria-expanded", "false");
+}
+
+async function selectScenario(id) {
+  selectedScenarioId = getScenario(id).id;
+  renderScenarioPicker();
+  closeScenarioPicker();
+  await StorageHelper.setPracticeScenario(selectedScenarioId);
 }
 
 async function setEnabled(next) {
@@ -59,10 +98,35 @@ toggleInput.addEventListener("change", () => {
   void setEnabled(toggleInput.checked);
 });
 
+scenarioPickerBtn.addEventListener("click", () => {
+  const nextOpen = scenarioPickerMenu.hidden;
+  scenarioPickerMenu.hidden = !nextOpen;
+  scenarioPickerBtn.setAttribute("aria-expanded", String(nextOpen));
+});
+
+scenarioPickerMenu.addEventListener("click", (event) => {
+  const item = event.target.closest("[data-id]");
+  if (!item) {
+    return;
+  }
+  void selectScenario(item.dataset.id);
+});
+
+document.addEventListener("click", (event) => {
+  if (
+    scenarioPickerMenu.hidden ||
+    event.target.closest("#scenario-picker")
+  ) {
+    return;
+  }
+  closeScenarioPicker();
+});
+
 document.getElementById("open-practice").addEventListener("click", () => {
-  void chrome.tabs.create({
-    url: chrome.runtime.getURL("practice/practice.html"),
-  });
+  const scenario = getScenario(selectedScenarioId);
+  const url = new URL(chrome.runtime.getURL(scenario.practicePage));
+  url.searchParams.set("scenario", scenario.id);
+  void chrome.tabs.create({ url: url.toString() });
 });
 
 document.getElementById("open-fixture").addEventListener("click", () => {
@@ -93,14 +157,18 @@ save.addEventListener("click", () => {
 
 async function load() {
   try {
-    const [nextEnabled, key] = await Promise.all([
+    const [nextEnabled, key, scenarioId] = await Promise.all([
       StorageHelper.getEnabled(),
       StorageHelper.getApiKey(),
+      StorageHelper.getPracticeScenario(DEFAULT_SCENARIO_ID),
     ]);
+    selectedScenarioId = scenarioId;
+    renderScenarioPicker();
     renderEnabled(nextEnabled);
     renderKey(key);
   } catch (e) {
     console.error("[exam-helper] popup 读取状态失败：", e);
+    renderScenarioPicker();
     renderEnabled(false);
     renderKey("");
   }
@@ -113,6 +181,12 @@ try {
     }
     if (changes[STORAGE_KEYS.apiKey]) {
       renderKey(changes[STORAGE_KEYS.apiKey].newValue || "");
+    }
+    if (changes[STORAGE_KEYS.practiceScenario]) {
+      selectedScenarioId =
+        changes[STORAGE_KEYS.practiceScenario].newValue ||
+        DEFAULT_SCENARIO_ID;
+      renderScenarioPicker();
     }
   });
 } catch (e) {
