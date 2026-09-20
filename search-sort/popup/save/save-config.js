@@ -1,11 +1,7 @@
 import { MESSAGE_ACTION } from "../../utils/messages.js";
 import { StorageHelper } from "../../utils/storage.js";
 import { applyURLToTab } from "../../utils/tab.js";
-import {
-  PARAM_MODE,
-  buildURLWithParamRules,
-  buildURLWithoutConfig,
-} from "../../utils/url.js";
+import { PARAM_MODE, buildURLWithParamRules } from "../../utils/url.js";
 
 const SAVE_BTN_LABEL = "保存并应用";
 const SAVE_FEEDBACK_MS = 1500;
@@ -50,7 +46,11 @@ export function createSaveConfig(deps) {
       }),
     };
 
-    let applyResult = { applied: false, reason: "unknown" };
+    /*
+     * 默认值注入与剔除配置外参数只在这里发生——参数集一变必须整页导航站点才读得到。
+     * 关掉开关时不动 URL：分不清哪些参数是注入的，剔除会连用户自己带的一起删
+     */
+    let applyResult = { applied: true, reason: "untouched" };
 
     try {
       await StorageHelper.setConfig(getRootDomain(), config);
@@ -62,14 +62,12 @@ export function createSaveConfig(deps) {
           config.params,
           PARAM_MODE.configOnly,
         );
-      } else {
-        appliedURL = buildURLWithoutConfig(url, config.params);
+        applyResult = await applyURLToTab({
+          tabId,
+          oldURL: url,
+          newURL: appliedURL,
+        });
       }
-      applyResult = await applyURLToTab({
-        tabId,
-        oldURL: url,
-        newURL: appliedURL,
-      });
 
       // background 只刷新图标；URL 已应用时用 appliedURL，否则用当前页 URL 读配置
       const iconURL = applyResult.applied

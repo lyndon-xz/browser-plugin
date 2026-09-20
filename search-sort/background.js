@@ -1,17 +1,19 @@
 import { extractRootDomain } from "./utils/domain.js";
 import { MESSAGE_ACTION } from "./utils/messages.js";
 import { StorageHelper } from "./utils/storage.js";
-import { applyURLToTab, forgetTab } from "./utils/tab.js";
+import { replaceURLInTab } from "./utils/tab.js";
 import {
   PARAM_MODE,
   buildURLWithParamRules,
-  buildURLWithoutConfig,
   isSupportedURL,
 } from "./utils/url.js";
 
 /*
  * service worker 负责 popup / content script 做不到的事：读 storage、按域名配置
  * 重排 URL、更新标签页图标，并串行化同一 tab 上的并发应用。
+ *
+ * 自动流程只重排参数顺序，不注入默认值、不剔除参数：参数集一变就得整页导航站点
+ * 才读得到，页面状态会全丢。默认值改由用户在 popup 点「保存并应用」时生效
  */
 
 const ICON_SIZES = [16, 32, 48, 128];
@@ -63,7 +65,7 @@ function readConfigForURL(url) {
 
 const applyGeneration = new Map();
 
-async function applyConfigToTab(tabId, url) {
+async function sortTabURL(tabId, url) {
   if (!isSupportedURL(url)) {
     return;
   }
@@ -78,32 +80,31 @@ async function applyConfigToTab(tabId, url) {
       return;
     }
 
-    if (!config) {
+    // 关掉开关后不再改 URL：分不清哪些参数是注入的，剔除会连用户自己带的一起删
+    if (!config?.isEnabled) {
       await updateIcon(tabId, ICON_STATE.inactive);
       return;
     }
 
-    const { isEnabled, params } = config;
-    const newURL = isEnabled
-      ? buildURLWithParamRules(url, params, PARAM_MODE.keepExtra)
-      : buildURLWithoutConfig(url, params);
-
-    if (applyGeneration.get(tabId) !== generation) {
-      return;
-    }
-
-    await applyURLToTab({ tabId, oldURL: url, newURL });
-
-    if (applyGeneration.get(tabId) !== generation) {
-      return;
-    }
-
-    await updateIcon(
-      tabId,
-      isEnabled ? ICON_STATE.active : ICON_STATE.inactive,
+    const sortedURL = buildURLWithParamRules(
+      url,
+      config.params,
+      PARAM_MODE.sortOnly,
     );
+
+    if (applyGeneration.get(tabId) !== generation) {
+      return;
+    }
+
+    await replaceURLInTab({ tabId, oldURL: url, newURL: sortedURL });
+
+    if (applyGeneration.get(tabId) !== generation) {
+      return;
+    }
+
+    await updateIcon(tabId, ICON_STATE.active);
   } catch (e) {
-    console.warn("[search-sort] 应用配置跳过：", e);
+    console.warn("[search-sort] 重排跳过：", e);
   }
 }
 
@@ -130,7 +131,7 @@ async function updateIconForTab(tabId, url) {
 const HANDLERS = {
   [MESSAGE_ACTION.urlChanged]: (message, sender) => {
     if (sender.tab) {
-      void applyConfigToTab(sender.tab.id, message.url);
+      void sortTabURL(sender.tab.id, message.url);
     }
   },
   [MESSAGE_ACTION.configUpdated]: (message) => {
@@ -140,13 +141,12 @@ const HANDLERS = {
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
-    void applyConfigToTab(tabId, tab.url);
+    void sortTabURL(tabId, tab.url);
   }
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   applyGeneration.delete(tabId);
-  forgetTab(tabId);
 });
 
 chrome.runtime.onMessage.addListener((message, sender) => {

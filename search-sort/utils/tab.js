@@ -9,56 +9,47 @@ import { hasSameSearchParams } from "./url.js";
 const isTabGoneError = (error) =>
   /No tab with id/i.test(error?.message ?? String(error));
 
-/** tab 关闭时清掉导航计数，避免 Map 泄漏 */
-export function forgetTab(tabId) {
-  navigationAttempts.delete(tabId);
-}
-
-/*
- * 站点若在服务端把注入的默认值重定向掉，会与本扩展形成
- * 「注入 → 刷新 → 站点剔除 → 再注入」的循环，同一 URL 超过上限即放弃导航。
- * service worker 被回收后计数归零，属兜底防护而非强保证
- */
-const MAX_NAVIGATION_PER_URL = 2;
-const NAVIGATION_WINDOW_MS = 5000;
-
-// tabId -> { url, count, firstAt }
-const navigationAttempts = new Map();
-
-function shouldSkipNavigation(tabId, newURL) {
-  const now = Date.now();
-
-  for (const [recordedTabId, recordedAttempt] of navigationAttempts) {
-    if (now - recordedAttempt.firstAt > NAVIGATION_WINDOW_MS) {
-      navigationAttempts.delete(recordedTabId);
-    }
-  }
-
-  const attempt = navigationAttempts.get(tabId);
-  if (!attempt) {
-    navigationAttempts.set(tabId, { url: newURL, count: 1, firstAt: now });
-    return false;
-  }
-
-  const { url, count } = attempt;
-  if (url !== newURL) {
-    navigationAttempts.set(tabId, { url: newURL, count: 1, firstAt: now });
-    return false;
-  }
-
-  attempt.count = count + 1;
-  return attempt.count > MAX_NAVIGATION_PER_URL;
-}
-
 function isStillSourceURL(currentURL, sourceURL) {
   return currentURL === sourceURL || hasSameSearchParams(currentURL, sourceURL);
 }
 
 /**
- * 把重排后的 URL 应用到指定标签页。分支看查询参数多重集是否相同（hasSameSearchParams）：
- * - 字符串完全相同：不处理
- * - 多重集相同：content script replaceState；sendMessage 失败时降级 tabs.update
- * - 多重集不同：tabs.update 整页导航
+ * 交给 content script 原地 replaceState，页面不重新加载。
+ * 只适用于参数多重集不变的重排；走不通就什么都不做，不会退化成整页导航
+ */
+export async function replaceURLInTab(urlUpdate) {
+  const { tabId, oldURL, newURL } = urlUpdate;
+  if (newURL === oldURL) {
+    return { applied: true, reason: "unchanged" };
+  }
+
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, {
+      action: MESSAGE_ACTION.apply,
+      url: newURL,
+      sourceURL: oldURL,
+    });
+    return {
+      applied: Boolean(response?.applied),
+      reason: response?.applied ? "soft-update" : "soft-update-skipped",
+    };
+  } catch (e) {
+    if (isTabGoneError(e)) {
+      return { applied: false, reason: "tab-gone" };
+    }
+    /*
+     * content script 尚未就绪（首屏未注入完、或扩展刚更新）。重排只是整理地址栏，
+     * 不值得为它刷新页面，跳过这次即可——下次 URL 变化会再来一遍
+     */
+    console.warn("[search-sort] sendMessage 失败，跳过本次重排：", e);
+    return { applied: false, reason: "content-script-unavailable" };
+  }
+}
+
+/**
+ * 把按配置改写的 URL 应用到指定标签页，供用户主动保存时调用：
+ * - 参数多重集不变：原地 replaceState
+ * - 参数有增删：只能整页导航，站点才读得到新参数
  */
 export async function applyURLToTab(urlUpdate) {
   const { tabId, oldURL, newURL } = urlUpdate;
@@ -67,31 +58,10 @@ export async function applyURLToTab(urlUpdate) {
   }
 
   if (hasSameSearchParams(oldURL, newURL)) {
-    try {
-      const response = await chrome.tabs.sendMessage(tabId, {
-        action: MESSAGE_ACTION.apply,
-        url: newURL,
-        sourceURL: oldURL,
-      });
-      if (response?.applied) {
-        return { applied: true, reason: "soft-update" };
-      }
-      return { applied: false, reason: "soft-update-skipped" };
-    } catch (e) {
-      if (isTabGoneError(e)) {
-        return { applied: false, reason: "tab-gone" };
-      }
-      /*
-       * content script 尚未就绪（首屏未注入完、或扩展刚更新），软更新走不通，
-       * 降级为整页导航，保证重排至少能生效
-       */
-      console.warn("[search-sort] sendMessage 失败，降级整页导航：", e);
+    const softResult = await replaceURLInTab(urlUpdate);
+    if (softResult.applied) {
+      return softResult;
     }
-  }
-
-  if (shouldSkipNavigation(tabId, newURL)) {
-    console.warn("[search-sort] 跳过导航以避免刷新循环：", newURL);
-    return { applied: false, reason: "navigation-skipped" };
   }
 
   let tab;
