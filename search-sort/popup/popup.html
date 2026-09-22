@@ -6,7 +6,8 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <div class="popup" id="popup">
+    <!-- data-state="loading"：配置读出来之前配置区不可操作，由 popup.js 解除 -->
+    <div class="popup" id="popup" data-state="loading">
       <div class="header">
         <div class="header-left">
           <div class="title">search-sort</div>
@@ -46,7 +47,7 @@
 
       <div class="footer">
         <p class="save-hint hidden" id="saveHint">改动尚未生效，请点击保存</p>
-        <button class="save-btn" id="saveBtn">保存并应用</button>
+        <button class="save-btn" id="saveBtn" disabled>保存并应用</button>
       </div>
     </div>
 

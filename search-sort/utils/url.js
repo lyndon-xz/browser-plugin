@@ -1,3 +1,23 @@
+/** 仅 http(s) 页面可配置查询参数 */
+export function isSupportedURL(url) {
+  return Boolean(url) && url.startsWith("http");
+}
+
+/*
+ * 默认值「未设置」的唯一关口：空串与缺失一律归一为 null，
+ * 之后各处只判 null，不必各自再防一遍 "" 与 undefined
+ */
+export function emptyDefaultToNull(value) {
+  return value === "" || value == null ? null : value;
+}
+
+/** 只比较查询参数多重集，pathname / hash 不在范围内 */
+export function hasSameSearchParams(oneURL, otherURL) {
+  const normalize = (url) =>
+    [...new URL(url).searchParams.entries()].sort().toString();
+  return normalize(oneURL) === normalize(otherURL);
+}
+
 /**
  * 参数处理模式：
  * - sortOnly：只按配置顺序重排现有参数，保留配置外的参数，不注入默认值。
@@ -10,32 +30,14 @@ export const PARAM_MODE = {
   configOnly: "config-only",
 };
 
-/** 仅 http(s) 页面可配置查询参数 */
-export function isSupportedURL(url) {
-  return Boolean(url) && url.startsWith("http");
-}
-
-/** popup 里空串默认值视为未设置 */
-export function emptyDefaultToNull(value) {
-  return value === "" ? null : value;
-}
-
-/** 只比较查询参数多重集，pathname / hash 不在范围内 */
-export function hasSameSearchParams(a, b) {
-  const normalize = (u) =>
-    [...new URL(u).searchParams.entries()].sort().toString();
-  return normalize(a) === normalize(b);
-}
-
-// 按配置顺序重排现有参数；configOnly 下还会注入缺失的默认值、丢掉配置外的参数
 function applyParamRules(currentParams, configParams, mode) {
-  const currentMap = new Map();
+  const valuesByKey = new Map();
 
   for (const [key, value] of currentParams) {
-    if (!currentMap.has(key)) {
-      currentMap.set(key, []);
+    if (!valuesByKey.has(key)) {
+      valuesByKey.set(key, []);
     }
-    currentMap.get(key).push(value);
+    valuesByKey.get(key).push(value);
   }
 
   const isConfigOnly = mode === PARAM_MODE.configOnly;
@@ -45,19 +47,19 @@ function applyParamRules(currentParams, configParams, mode) {
   configParams.forEach((param) => {
     const { key, defaultValue } = param;
 
-    if (currentMap.has(key)) {
-      currentMap.get(key).forEach((value) => {
+    if (valuesByKey.has(key)) {
+      valuesByKey.get(key).forEach((value) => {
         sorted.append(key, value);
       });
       addedKeys.add(key);
-    } else if (isConfigOnly && defaultValue != null && defaultValue !== "") {
+    } else if (isConfigOnly && defaultValue != null) {
       sorted.append(key, defaultValue);
       addedKeys.add(key);
     }
   });
 
   if (!isConfigOnly) {
-    for (const [key, values] of currentMap) {
+    for (const [key, values] of valuesByKey) {
       if (!addedKeys.has(key)) {
         values.forEach((value) => {
           sorted.append(key, value);

@@ -1,36 +1,20 @@
 import { extractRootDomain } from "../utils/domain.js";
+import { isTabGoneError } from "../utils/runtime-error.js";
 import { StorageHelper } from "../utils/storage.js";
 import { isSupportedURL } from "../utils/url.js";
 
-import { bindAddParamForm } from "./params/add-param.js";
-import { createParamsRenderer } from "./params/render-params.js";
+import { bindAddParamForm } from "./params/add.js";
+import { createParamsRenderer } from "./params/render.js";
+import { createParamsStore } from "./params/store.js";
+import { createSaveConfig } from "./save/config.js";
 import { createDirtyState } from "./save/dirty-state.js";
-import { createSaveConfig } from "./save/save-config.js";
+import { POPUP_STATE } from "./ui-state.js";
 
-// 参数项结构：{ key, defaultValue, isNew }
-const params = [];
-
-const paramsListEl = document.getElementById("paramsList");
-const addSection = document.getElementById("addSection");
-const stateBox = document.getElementById("stateBox");
-const stateTitle = document.getElementById("stateTitle");
-const stateDesc = document.getElementById("stateDesc");
-const addForm = document.getElementById("addForm");
-const addKey = document.getElementById("addKey");
-const addValue = document.getElementById("addValue");
-const addConfirm = document.getElementById("addConfirm");
-const addCancel = document.getElementById("addCancel");
-const toggleEl = document.getElementById("toggle");
-const saveBtn = document.getElementById("saveBtn");
-const saveHint = document.getElementById("saveHint");
 const popupEl = document.getElementById("popup");
-const domainEl = document.getElementById("domain");
+const store = createParamsStore();
 
 let currentTab = null;
 let rootDomain = "";
-
-const isTabGoneError = (error) =>
-  /No tab with id/i.test(error?.message ?? String(error));
 
 async function refreshCurrentTab() {
   if (!currentTab?.id) {
@@ -48,64 +32,71 @@ async function refreshCurrentTab() {
   }
 }
 
-const dirtyState = createDirtyState({
+const toggleEl = document.getElementById("toggle");
+const saveBtn = document.getElementById("saveBtn");
+const saveHint = document.getElementById("saveHint");
+
+const { syncDirtyState, setBaseline } = createDirtyState({
   toggleEl,
   saveBtn,
   saveHint,
   popupEl,
-  getParams: () => params,
+  store,
 });
+
+// Switch 只是 UI 状态，随保存按钮一起写入 storage，不单独触发任何动作
+toggleEl.addEventListener("change", syncDirtyState);
+
+const paramsListEl = document.getElementById("paramsList");
+const addSection = document.getElementById("addSection");
+const stateBox = document.getElementById("stateBox");
+const stateTitle = document.getElementById("stateTitle");
+const stateDesc = document.getElementById("stateDesc");
 
 const { renderParams, showState } = createParamsRenderer({
-  params,
-  elements: {
-    paramsListEl,
-    addSection,
-    stateBox,
-    stateTitle,
-    stateDesc,
-  },
-  onDirty: dirtyState.syncDirtyState,
+  store,
+  elements: { paramsListEl, addSection, stateBox, stateTitle, stateDesc },
+  onDirty: syncDirtyState,
 });
 
+const addBtn = document.getElementById("addBtn");
+const addForm = document.getElementById("addForm");
+const addKey = document.getElementById("addKey");
+const addValue = document.getElementById("addValue");
+const addConfirm = document.getElementById("addConfirm");
+const addCancel = document.getElementById("addCancel");
+
 bindAddParamForm({
-  params,
-  elements: { addSection, addForm, addKey, addValue, addConfirm, addCancel },
+  store,
+  elements: {
+    addBtn,
+    addSection,
+    addForm,
+    addKey,
+    addValue,
+    addConfirm,
+    addCancel,
+  },
   renderParams,
-  onDirty: dirtyState.syncDirtyState,
+  onDirty: syncDirtyState,
 });
 
 createSaveConfig({
   saveBtn,
   toggleEl,
-  getParams: () => params,
+  store,
   refreshCurrentTab,
   getRootDomain: () => rootDomain,
   renderParams,
-  adoptBaseline: dirtyState.adoptBaseline,
+  setBaseline,
 });
 
-// Switch 只是 UI 状态，随保存按钮一起写入 storage，不单独触发任何动作
-toggleEl.addEventListener("change", dirtyState.syncDirtyState);
-
 function blockConfiguring(stateText) {
-  popupEl.dataset.state = "blocked";
+  popupEl.dataset.state = POPUP_STATE.blocked;
   showState(stateText);
 }
 
-function mergeCurrentUrlParams(searchParams, existing, hasSavedConfig) {
-  const merged = [...existing];
-  for (const [key] of searchParams) {
-    if (!merged.some((param) => param.key === key)) {
-      merged.push({
-        key,
-        defaultValue: null,
-        isNew: Boolean(hasSavedConfig),
-      });
-    }
-  }
-  return merged;
-}
+const domainEl = document.getElementById("domain");
 
 async function init() {
   try {
@@ -124,32 +115,28 @@ async function init() {
       return;
     }
 
-    const pageURL = new URL(url);
-    const { hostname, searchParams } = pageURL;
+    const { hostname, searchParams } = new URL(url);
     rootDomain = extractRootDomain(hostname);
     domainEl.textContent = rootDomain;
 
     const savedConfig = await StorageHelper.getConfig(rootDomain);
     if (savedConfig) {
-      const { isEnabled, params: savedParams } = savedConfig;
-      toggleEl.checked = isEnabled;
-      params.splice(
-        0,
-        params.length,
-        ...savedParams.map((param) => ({ ...param, isNew: false })),
-      );
-      dirtyState.setBaselineFromSaved(savedConfig);
+      toggleEl.checked = savedConfig.isEnabled;
+      store.replaceAll(savedConfig.params);
+      setBaseline(savedConfig);
     }
 
-    const merged = mergeCurrentUrlParams(searchParams, params, savedConfig);
-    params.splice(0, params.length, ...merged);
+    // URL 上有、配置里没有的参数补进列表；已存过配置时标「新」提示是这次多出来的
+    store.appendMissingKeys([...searchParams.keys()], {
+      isNew: Boolean(savedConfig),
+    });
 
     if (!savedConfig) {
-      dirtyState.setBaselineFromCurrent();
+      setBaseline();
     }
 
     renderParams();
-    dirtyState.syncDirtyState();
+    syncDirtyState();
   } catch (e) {
     console.error("[search-sort] popup 初始化失败：", e);
     blockConfiguring({
@@ -159,9 +146,13 @@ async function init() {
   }
 }
 
-saveBtn.disabled = true;
-void init().finally(() => {
-  if (popupEl.dataset.state !== "blocked") {
-    saveBtn.disabled = false;
-  }
-});
+/*
+ * popup.html 上预置了 data-state="loading"：配置读出来之前整个配置区不可操作，
+ * 否则这段窗口里的改动会被恢复出来的配置整体覆盖掉
+ */
+await init();
+
+if (popupEl.dataset.state === POPUP_STATE.loading) {
+  delete popupEl.dataset.state;
+  saveBtn.disabled = false;
+}

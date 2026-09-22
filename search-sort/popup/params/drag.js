@@ -1,5 +1,11 @@
-/** popup.js 读写同一份：列表项在参数数组里的序号 */
+/** render.js 写入、drag.js 读回：列表项在参数数组里的序号 */
 export const PARAM_INDEX_ATTR = "index";
+
+/** 拖拽手柄的 class，render.js 建节点时用同一个 */
+export const DRAG_HANDLE_CLASS = "drag-handle";
+
+const DRAGGING_CLASS = "dragging";
+const DROP_HINT_CLASS = "drag-over";
 
 /*
  * 浏览器默认把拖拽源节点（这里是 ≡ 手柄）截成跟随光标的拖拽影像，看上去是一个
@@ -17,32 +23,33 @@ export function createDragSort(onReorder) {
   function startDrag(e, item) {
     const { dataTransfer } = e;
     dragIndex = Number(item.dataset[PARAM_INDEX_ATTR]);
-    item.classList.add("dragging");
+    item.classList.add(DRAGGING_CLASS);
     dataTransfer.effectAllowed = "move";
     dataTransfer.setDragImage(emptyDragImage, 0, 0);
   }
 
   function allowDrop(e) {
+    const { currentTarget } = e;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
 
     // 拖到自己头上落点不变，不画插入线
-    if (Number(e.currentTarget.dataset[PARAM_INDEX_ATTR]) === dragIndex) {
+    if (Number(currentTarget.dataset[PARAM_INDEX_ATTR]) === dragIndex) {
       return;
     }
-    e.currentTarget.classList.add("drag-over");
+    currentTarget.classList.add(DROP_HINT_CLASS);
   }
 
   function clearDropHint(e) {
-    e.currentTarget.classList.remove("drag-over");
+    e.currentTarget.classList.remove(DROP_HINT_CLASS);
   }
 
   function reorderParams(e) {
+    const { currentTarget } = e;
     e.preventDefault();
 
-    const { currentTarget } = e;
     const dropIndex = Number(currentTarget.dataset[PARAM_INDEX_ATTR]);
-    currentTarget.classList.remove("drag-over");
+    currentTarget.classList.remove(DROP_HINT_CLASS);
 
     if (dragIndex === null || dragIndex === dropIndex) {
       return;
@@ -52,16 +59,16 @@ export function createDragSort(onReorder) {
   }
 
   function endDrag(item) {
-    item.classList.remove("dragging");
+    item.classList.remove(DRAGGING_CLASS);
     dragIndex = null;
     document
-      .querySelectorAll(".drag-over")
-      .forEach((el) => el.classList.remove("drag-over"));
+      .querySelectorAll(`.${DROP_HINT_CLASS}`)
+      .forEach((el) => el.classList.remove(DROP_HINT_CLASS));
   }
 
   return {
     bindItem(item) {
-      const dragHandle = item.querySelector(".drag-handle");
+      const dragHandle = item.querySelector(`.${DRAG_HANDLE_CLASS}`);
       item.draggable = false;
       dragHandle.draggable = true;
       dragHandle.addEventListener("dragstart", (e) => startDrag(e, item));

@@ -7,30 +7,24 @@
 
   const load = (path) => import(chrome.runtime.getURL(path));
 
-  const isOrphaned = (error) =>
-    /Extension context invalidated|message port closed/i.test(
-      error?.message ?? "",
-    );
-
-  const report = (error) => {
-    if (!isOrphaned(error)) {
-      console.error("[search-sort] 启动失败：", error);
-    }
-  };
-
   let teardown = null;
 
   function unmount() {
-    try {
-      teardown?.();
-    } catch {
-      /* 扩展上下文已失效时 teardown 可能访问不到 chrome API */
-    }
+    // teardown 自己已经收口了失效上下文的报错，这里不再兜一层
+    teardown?.();
     teardown = null;
   }
 
   function mount() {
     void (async () => {
+      let isOrphanedError;
+      try {
+        ({ isOrphanedError } = await load("utils/runtime-error.js"));
+      } catch {
+        // 连判定模块都取不到，只可能是扩展上下文已失效，静默退出
+        return;
+      }
+
       try {
         const entry = await load("content/entry.js");
         const result = entry?.init();
@@ -38,7 +32,9 @@
           teardown = result;
         }
       } catch (error) {
-        report(error);
+        if (!isOrphanedError(error)) {
+          console.error("[search-sort] 启动失败：", error);
+        }
       }
     })();
   }

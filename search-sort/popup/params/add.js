@@ -1,15 +1,21 @@
 import { emptyDefaultToNull } from "../../utils/url.js";
-import { HIDDEN_CLASS } from "../classes.js";
+import { HIDDEN_CLASS } from "../ui-state.js";
+import { flashInvalid } from "./flash-invalid.js";
 
 const KEY_ERROR_HINT_MS = 1000;
 
 /** 绑定「新增参数」表单与快捷键 */
 export function bindAddParamForm(deps) {
-  const { params, elements, renderParams, onDirty } = deps;
-  const { addSection, addForm, addKey, addValue, addConfirm, addCancel } =
-    elements;
-
-  const addBtn = document.getElementById("addBtn");
+  const { store, elements, renderParams, onDirty } = deps;
+  const {
+    addBtn,
+    addSection,
+    addForm,
+    addKey,
+    addValue,
+    addConfirm,
+    addCancel,
+  } = elements;
 
   addBtn.addEventListener("click", () => {
     addSection.classList.add(HIDDEN_CLASS);
@@ -31,15 +37,12 @@ export function bindAddParamForm(deps) {
       return;
     }
 
-    if (params.some((param) => param.key === key)) {
-      addKey.classList.add("error");
-      setTimeout(() => {
-        addKey.classList.remove("error");
-      }, KEY_ERROR_HINT_MS);
+    if (store.hasKey(key)) {
+      flashInvalid(addKey, KEY_ERROR_HINT_MS);
       return;
     }
 
-    params.unshift({
+    store.insertFirst({
       key,
       defaultValue: emptyDefaultToNull(addValue.value.trim()),
       isNew: true,

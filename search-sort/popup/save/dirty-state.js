@@ -1,68 +1,58 @@
-import { HIDDEN_CLASS } from "../classes.js";
+import { normalizeParams } from "../params/normalize.js";
+import { HIDDEN_CLASS, POPUP_STATE } from "../ui-state.js";
 
-/** 对比/持久化用：去掉 UI 字段，defaultValue 归一 null */
-export function normalizeParamsForCompare(paramList) {
-  return paramList.map(({ key, defaultValue }) => ({
-    key,
-    defaultValue: defaultValue ?? null,
-  }));
-}
-
-function isSameConfig(a, b) {
-  if (a.isEnabled !== b.isEnabled) {
+function isSameConfig(current, baseline) {
+  if (current.isEnabled !== baseline.isEnabled) {
     return false;
   }
-  if (a.params.length !== b.params.length) {
+
+  const { params: currentParams } = current;
+  const { params: baselineParams } = baseline;
+  if (currentParams.length !== baselineParams.length) {
     return false;
   }
-  return a.params.every(
+  return currentParams.every(
     (param, index) =>
-      param.key === b.params[index].key &&
-      param.defaultValue === b.params[index].defaultValue,
+      param.key === baselineParams[index].key &&
+      param.defaultValue === baselineParams[index].defaultValue,
   );
 }
 
 /** 跟踪相对 baseline 的未保存状态，驱动保存按钮样式与提示 */
 export function createDirtyState(deps) {
-  const { toggleEl, saveBtn, saveHint, popupEl, getParams } = deps;
-  let baseline = { isEnabled: false, params: [] };
+  const { toggleEl, saveBtn, saveHint, popupEl, store } = deps;
+
+  // 配置还没读出来，此时拿任何基准比出的脏态都是错的
+  let baseline = null;
 
   function getCurrentConfig() {
     return {
       isEnabled: toggleEl.checked,
-      params: normalizeParamsForCompare(getParams()),
+      params: normalizeParams(store.list()),
     };
   }
 
   function syncDirtyState() {
-    if (popupEl?.dataset.state === "blocked") {
+    if (baseline === null || popupEl.dataset.state === POPUP_STATE.blocked) {
       return;
     }
-    const dirty = !isSameConfig(getCurrentConfig(), baseline);
-    saveBtn.classList.toggle("dirty", dirty);
-    saveHint.classList.toggle(HIDDEN_CLASS, !dirty);
-  }
-
-  function adoptBaseline() {
-    baseline = getCurrentConfig();
-    syncDirtyState();
-  }
-
-  function setBaselineFromSaved(savedConfig) {
-    baseline = {
-      isEnabled: savedConfig.isEnabled,
-      params: normalizeParamsForCompare(savedConfig.params),
-    };
-  }
-
-  function setBaselineFromCurrent() {
-    baseline = getCurrentConfig();
+    const isDirty = !isSameConfig(getCurrentConfig(), baseline);
+    saveBtn.classList.toggle("dirty", isDirty);
+    saveHint.classList.toggle(HIDDEN_CLASS, !isDirty);
   }
 
   return {
     syncDirtyState,
-    adoptBaseline,
-    setBaselineFromSaved,
-    setBaselineFromCurrent,
+
+    /** 传入已存配置就以它为基准，不传则以当前界面为基准 */
+    setBaseline(savedConfig) {
+      baseline = savedConfig
+        ? {
+            isEnabled: savedConfig.isEnabled,
+            params: normalizeParams(savedConfig.params),
+          }
+        : getCurrentConfig();
+      syncDirtyState();
+    },
   };
 }

@@ -6,6 +6,8 @@
   --primary-shadow: rgb(74 144 217 / 15%);
   --success: #4caf50;
   --danger: #e74c3c;
+  /* 派生自 --danger，跟着源色走；相对颜色语法 Chrome 119+ 支持 */
+  --danger-soft: rgb(from var(--danger) r g b / 12%);
   --text-primary: #1a1a1a;
   --text-secondary: #666;
   --text-muted: #999;
@@ -24,6 +26,13 @@
   --badge-text: #f57c00;
   --badge-text-hover: #e65100;
   --font-mono: "SF Mono", "Fira Code", monospace;
+
+  /* 反复出现的排版尺度，改弹窗密度时只动这几处 */
+  --space-inline: 20px;
+  --space-block: 12px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --font-sm: 12px;
 }
 
 * {
@@ -55,7 +64,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: 16px var(--space-inline);
   border-bottom: 1px solid var(--divider);
 }
 
@@ -72,7 +81,7 @@ body {
 }
 
 .domain {
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
 }
 
@@ -133,7 +142,7 @@ body {
  */
 .params-list {
   min-height: 0;
-  padding: 12px 20px;
+  padding: var(--space-block) var(--space-inline);
   overflow-y: auto;
   border-bottom: 1px solid var(--divider);
 }
@@ -164,7 +173,7 @@ body {
   user-select: none;
   background: var(--surface-muted);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition:
     background 0.15s,
     border-color 0.15s,
@@ -195,7 +204,7 @@ body {
   color: var(--text-muted);
   text-align: center;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition:
     color 0.15s,
     background 0.15s;
@@ -208,7 +217,7 @@ body {
 
 .param-index.error {
   color: var(--danger);
-  background: rgb(231 76 60 / 12%);
+  background: var(--danger-soft);
 }
 
 .param-index-input {
@@ -219,11 +228,11 @@ body {
   font-weight: 600;
   color: var(--text-primary);
   text-align: center;
+  appearance: textfield;
+  -moz-appearance: textfield;
   outline: none;
   border: none;
   border-bottom: 1.5px solid var(--primary);
-  appearance: textfield;
-  -moz-appearance: textfield;
 }
 
 .param-index-input::-webkit-outer-spin-button,
@@ -259,12 +268,12 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--primary);
   white-space: nowrap;
   cursor: pointer;
   background: var(--primary-soft);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .param-value.empty {
@@ -282,7 +291,7 @@ body {
   width: 80px;
   padding: 2px 6px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-primary);
   outline: none;
   background: transparent;
@@ -319,7 +328,7 @@ body {
 
 /* Add Section */
 .add-section {
-  padding: 12px 20px;
+  padding: var(--space-block) var(--space-inline);
 }
 
 .add-btn {
@@ -331,7 +340,7 @@ body {
   cursor: pointer;
   background: transparent;
   border: 1px dashed var(--border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition:
     border-color 0.15s,
     color 0.15s;
@@ -345,10 +354,10 @@ body {
 /* Add Form */
 .add-form {
   padding: 12px;
-  margin: 12px 20px;
+  margin: var(--space-block) var(--space-inline);
   background: var(--primary-faint);
   border: 1px dashed var(--primary);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .add-form-row {
@@ -374,10 +383,10 @@ body {
   min-width: 0;
   padding: 8px 10px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--font-sm);
   outline: none;
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: border-color 0.15s;
 }
 
@@ -398,12 +407,12 @@ body {
 
 .btn-cancel {
   padding: 6px 16px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
   cursor: pointer;
   background: var(--surface-subtle);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .btn-cancel:hover {
@@ -412,12 +421,12 @@ body {
 
 .btn-confirm {
   padding: 6px 16px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-on-primary);
   cursor: pointer;
   background: var(--primary);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .btn-confirm:hover {
@@ -426,13 +435,13 @@ body {
 
 /* Footer */
 .footer {
-  padding: 16px 20px;
+  padding: 16px var(--space-inline);
   border-top: 1px solid var(--divider);
 }
 
 .save-hint {
   margin-bottom: 10px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   line-height: 1.5;
   color: var(--badge-text);
   text-align: center;
@@ -447,12 +456,18 @@ body {
   cursor: pointer;
   background: var(--primary);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition: background 0.2s;
 }
 
-.save-btn:hover {
+.save-btn:not(:disabled):hover {
   background: var(--primary-hover);
+}
+
+.save-btn:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  background: var(--surface-subtle);
 }
 
 .save-btn.dirty {
@@ -486,7 +501,7 @@ body {
 
 .state-desc {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   line-height: 1.7;
   color: var(--text-placeholder);
 }
@@ -501,6 +516,18 @@ body {
 .popup[data-state="blocked"] .add-form,
 .popup[data-state="blocked"] .footer {
   display: none;
+}
+
+/*
+ * 配置还没从 storage 读出来：配置区不接受交互——这段窗口里的改动会被恢复出来的
+ * 配置整体覆盖掉。只挡交互不隐藏，免得 popup 打开瞬间先闪一下空白
+ */
+.popup[data-state="loading"] .toggle-wrapper,
+.popup[data-state="loading"] .params-list,
+.popup[data-state="loading"] .add-section,
+.popup[data-state="loading"] .add-form {
+  pointer-events: none;
+  opacity: 0.5;
 }
 
 /* Utility */

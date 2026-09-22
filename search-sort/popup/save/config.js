@@ -1,0 +1,119 @@
+import { MESSAGE_ACTION } from "../../utils/messages.js";
+import { StorageHelper } from "../../utils/storage.js";
+import { applyURLToTab } from "../../utils/tab.js";
+import { PARAM_MODE, buildURLWithParamRules } from "../../utils/url.js";
+
+import { normalizeParams } from "../params/normalize.js";
+
+const SAVE_BTN_LABEL = "保存并应用";
+const SAVE_FEEDBACK_MS = 1500;
+const SUCCESS_CLASS = "success";
+const FAILED_CLASS = "failed";
+
+/** 保存配置、应用到当前标签页，并反馈保存结果 */
+export function createSaveConfig(deps) {
+  const {
+    saveBtn,
+    toggleEl,
+    store,
+    refreshCurrentTab,
+    getRootDomain,
+    renderParams,
+    setBaseline,
+  } = deps;
+
+  let feedbackTimer = null;
+  let isSaving = false;
+
+  function showSaveResult(text, isSuccess) {
+    // 清掉上一轮的定时复位，否则它会把这一轮刚显示的结果提前抹掉
+    clearTimeout(feedbackTimer);
+
+    saveBtn.textContent = text;
+    saveBtn.classList.toggle(SUCCESS_CLASS, isSuccess);
+    saveBtn.classList.toggle(FAILED_CLASS, !isSuccess);
+
+    feedbackTimer = setTimeout(() => {
+      saveBtn.textContent = SAVE_BTN_LABEL;
+      saveBtn.classList.remove(SUCCESS_CLASS);
+      saveBtn.classList.remove(FAILED_CLASS);
+    }, SAVE_FEEDBACK_MS);
+  }
+
+  /*
+   * 默认值注入与剔除配置外参数只在这里发生——参数集一变必须整页导航站点才读得到。
+   * 关掉开关时不动 URL：分不清哪些参数是注入的，剔除会连用户自己带的一起删
+   */
+  async function persistAndApply(currentTab, config) {
+    await StorageHelper.setConfig(getRootDomain(), config);
+
+    const { id: tabId, url } = currentTab;
+    const { isEnabled, params } = config;
+
+    let appliedURL = url;
+    let isApplied = true;
+    if (isEnabled) {
+      appliedURL = buildURLWithParamRules(url, params, PARAM_MODE.configOnly);
+      ({ isApplied } = await applyURLToTab({
+        tabId,
+        oldURL: url,
+        newURL: appliedURL,
+      }));
+    }
+
+    // background 只刷新图标；URL 已应用时用 appliedURL，否则用当前页 URL 读配置
+    const iconURL = isApplied ? appliedURL : (await refreshCurrentTab())?.url;
+    if (iconURL) {
+      await chrome.runtime.sendMessage({
+        action: MESSAGE_ACTION.configUpdated,
+        tabId,
+        url: iconURL,
+      });
+    }
+
+    return isApplied;
+  }
+
+  function onSaved(config, isApplied) {
+    store.markAllSaved();
+    renderParams();
+    setBaseline();
+
+    if (isApplied) {
+      showSaveResult(config.isEnabled ? "✓ 已应用" : "✓ 已保存", true);
+      return;
+    }
+    showSaveResult("✓ 已保存（页面已跳转，请重开 popup）", true);
+  }
+
+  async function saveConfig() {
+    // 连点会走两遍「读整份 configs → 改一个域名 → 整份写回」，还可能发两次导航
+    if (isSaving) {
+      return;
+    }
+    isSaving = true;
+    saveBtn.disabled = true;
+
+    try {
+      const currentTab = await refreshCurrentTab();
+      if (!currentTab?.url) {
+        showSaveResult("标签页已关闭", false);
+        return;
+      }
+
+      const config = {
+        isEnabled: toggleEl.checked,
+        params: normalizeParams(store.list()),
+      };
+      onSaved(config, await persistAndApply(currentTab, config));
+    } catch (e) {
+      console.error("[search-sort] 保存配置失败：", e);
+      showSaveResult("保存失败，请重试", false);
+    } finally {
+      isSaving = false;
+      saveBtn.disabled = false;
+    }
+  }
+
+  saveBtn.addEventListener("click", () => void saveConfig());
+}

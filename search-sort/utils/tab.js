@@ -1,13 +1,11 @@
 import { MESSAGE_ACTION } from "./messages.js";
+import { isTabGoneError } from "./runtime-error.js";
 import { hasSameSearchParams } from "./url.js";
 
 /*
  * 标签页操作相关工具。依赖 chrome.tabs，仅供 background / popup 使用，
  * 不应注入到内容脚本（content script）环境。
  */
-
-const isTabGoneError = (error) =>
-  /No tab with id/i.test(error?.message ?? String(error));
 
 function isStillSourceURL(currentURL, sourceURL) {
   return currentURL === sourceURL || hasSameSearchParams(currentURL, sourceURL);
@@ -20,7 +18,7 @@ function isStillSourceURL(currentURL, sourceURL) {
 export async function replaceURLInTab(urlUpdate) {
   const { tabId, oldURL, newURL } = urlUpdate;
   if (newURL === oldURL) {
-    return { applied: true, reason: "unchanged" };
+    return { isApplied: true };
   }
 
   try {
@@ -29,20 +27,16 @@ export async function replaceURLInTab(urlUpdate) {
       url: newURL,
       sourceURL: oldURL,
     });
-    return {
-      applied: Boolean(response?.applied),
-      reason: response?.applied ? "soft-update" : "soft-update-skipped",
-    };
+    return { isApplied: Boolean(response?.isApplied) };
   } catch (e) {
     if (isTabGoneError(e)) {
-      return { applied: false, reason: "tab-gone" };
+      return { isApplied: false };
     }
     /*
-     * content script 尚未就绪（首屏未注入完、或扩展刚更新）。重排只是整理地址栏，
-     * 不值得为它刷新页面，跳过这次即可——下次 URL 变化会再来一遍
+     * content script 还没就绪或跑不起来（首屏未注入完、扩展刚更新、页面禁止注入）。
+     * 属预期情形，不告警：就绪后它会主动上报 URL，重排在那时补上
      */
-    console.warn("[search-sort] sendMessage 失败，跳过本次重排：", e);
-    return { applied: false, reason: "content-script-unavailable" };
+    return { isApplied: false };
   }
 }
 
@@ -54,13 +48,13 @@ export async function replaceURLInTab(urlUpdate) {
 export async function applyURLToTab(urlUpdate) {
   const { tabId, oldURL, newURL } = urlUpdate;
   if (newURL === oldURL) {
-    return { applied: true, reason: "unchanged" };
+    return { isApplied: true };
   }
 
   if (hasSameSearchParams(oldURL, newURL)) {
-    const softResult = await replaceURLInTab(urlUpdate);
-    if (softResult.applied) {
-      return softResult;
+    const { isApplied } = await replaceURLInTab(urlUpdate);
+    if (isApplied) {
+      return { isApplied };
     }
   }
 
@@ -69,20 +63,20 @@ export async function applyURLToTab(urlUpdate) {
     tab = await chrome.tabs.get(tabId);
   } catch (e) {
     if (isTabGoneError(e)) {
-      return { applied: false, reason: "tab-gone" };
+      return { isApplied: false };
     }
     throw e;
   }
   if (!tab.url || !isStillSourceURL(tab.url, oldURL)) {
-    return { applied: false, reason: "source-mismatch" };
+    return { isApplied: false };
   }
 
   try {
     await chrome.tabs.update(tabId, { url: newURL });
-    return { applied: true, reason: "hard-navigation" };
+    return { isApplied: true };
   } catch (e) {
     if (isTabGoneError(e)) {
-      return { applied: false, reason: "tab-gone" };
+      return { isApplied: false };
     }
     throw e;
   }
