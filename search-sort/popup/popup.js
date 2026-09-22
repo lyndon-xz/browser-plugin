@@ -180,6 +180,13 @@ async function init() {
 await init();
 
 if (popupEl.dataset.state === POPUP_STATE.loading) {
+  /*
+   * 先强制算一次样式，让 init 里那次「开关置为已启用」在 loading 态（过渡被关掉）
+   * 落定。不这么做的话，它和下面解除 loading 会合进同一帧：过渡刚好在那一刻被
+   * 重新打开，滑块就从灰滑到绿——这正是打开 popup 时看到的那下闪动
+   */
+  void popupEl.offsetHeight;
+
   delete popupEl.dataset.state;
   saveBtn.disabled = false;
 }

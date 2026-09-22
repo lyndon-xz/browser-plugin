@@ -667,6 +667,16 @@ body {
   visibility: hidden;
 }
 
+/*
+ * 恢复期间一律不做过渡。开关、保存按钮这些控件的初始态都在这时落定，带着过渡就会
+ * 被看成一次入场动画——开关从灰滑到绿、保存按钮从灰渐变到琥珀，都是这么来的。
+ * 过渡留给之后真正由用户触发的变化
+ */
+.popup[data-state="loading"] *,
+.popup[data-state="loading"] *::after {
+  transition: none;
+}
+
 .popup[data-state="loading"] .params-list,
 .popup[data-state="loading"] .add-form,
 .popup[data-state="loading"] .action-bar {
