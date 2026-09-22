@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "search-sort",
-  "version": "3.1.0",
+  "version": "3.3.0",
   "description": "对任意网站的 URL 查询参数排序，并设置默认值",
   "icons": {
     "16": "icons/active/icon-16.png",

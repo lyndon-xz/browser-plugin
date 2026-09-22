@@ -8,3 +8,11 @@ export const POPUP_STATE = {
   // 当前页不支持配置，或配置读取失败
   blocked: "blocked",
 };
+
+/** 路径提示的 data-state，popup.css 按这些值给不同颜色 */
+export const PATH_HINT_STATE = {
+  neutral: "neutral",
+  matched: "matched",
+  unmatched: "unmatched",
+  invalid: "invalid",
+};

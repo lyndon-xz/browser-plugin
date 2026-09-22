@@ -1,6 +1,7 @@
+import { normalizePathPattern } from "./path-rule.js";
 import { emptyDefaultToNull } from "./url.js";
 
-// 全部域名配置的落盘根键，值结构为 { [rootDomain]: { isEnabled, params } }
+// 全部域名配置的落盘根键，值结构为 { [rootDomain]: { isEnabled, pathPattern, params } }
 const CONFIGS_STORAGE_KEY = "configs";
 
 async function readConfigs() {
@@ -14,9 +15,11 @@ function fromStored(config) {
   }
 
   // enabled 是 2.0 之前的键名，只在这里兜底读，新数据不再写
-  const { enabled, isEnabled, params } = config;
+  const { enabled, isEnabled, pathPattern, params } = config;
   return {
     isEnabled: isEnabled ?? enabled ?? false,
+    // 3.3 之前没有这个字段，缺失即不限路径
+    pathPattern: normalizePathPattern(pathPattern),
     params: Array.isArray(params)
       ? params.map((param) => {
           const { key, defaultValue } = param;
@@ -55,8 +58,8 @@ export const StorageHelper = {
 
   async setConfig(rootDomain, config) {
     const configs = await readConfigs();
-    const { isEnabled, params } = config;
-    configs[rootDomain] = { isEnabled, params };
+    const { isEnabled, pathPattern, params } = config;
+    configs[rootDomain] = { isEnabled, pathPattern, params };
     await chrome.storage.local.set({ [CONFIGS_STORAGE_KEY]: configs });
   },
 };

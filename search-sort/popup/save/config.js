@@ -1,25 +1,43 @@
+import { isPathPatternSupportedByRules } from "../../utils/default-param-rules.js";
 import { MESSAGE_ACTION } from "../../utils/messages.js";
+import {
+  PATH_PATTERN_ERROR,
+  isConfigActiveForURL,
+  validatePathPattern,
+} from "../../utils/path-rule.js";
 import { StorageHelper } from "../../utils/storage.js";
 import { applyURLToTab } from "../../utils/tab.js";
 import { PARAM_MODE, buildURLWithParamRules } from "../../utils/url.js";
-
-import { normalizeParams } from "../params/normalize.js";
 
 const SAVE_BTN_LABEL = "保存并应用";
 const SAVE_FEEDBACK_MS = 1500;
 const SUCCESS_CLASS = "success";
 const FAILED_CLASS = "failed";
 
+/** 路径正则要两个消费方都用得上：结构上编译得出来，DNR 那边也得收 */
+async function findPathPatternError(pathPattern) {
+  const { isValid, reason } = validatePathPattern(pathPattern);
+  if (!isValid) {
+    return reason;
+  }
+
+  if (!(await isPathPatternSupportedByRules(pathPattern))) {
+    return PATH_PATTERN_ERROR.unsupportedByRules;
+  }
+  return null;
+}
+
 /** 保存配置、应用到当前标签页，并反馈保存结果 */
 export function createSaveConfig(deps) {
   const {
     saveBtn,
-    toggleEl,
     store,
+    readDraft,
     refreshCurrentTab,
     getRootDomain,
     renderParams,
     setBaseline,
+    onInvalidPathPattern,
   } = deps;
 
   let feedbackTimer = null;
@@ -42,18 +60,23 @@ export function createSaveConfig(deps) {
 
   /*
    * 默认值注入与剔除配置外参数只在这里发生——参数集一变必须整页导航站点才读得到。
-   * 关掉开关时不动 URL：分不清哪些参数是注入的，剔除会连用户自己带的一起删
+   * 不在作用范围内（开关关掉，或当前页路径不命中）时不动 URL：分不清哪些参数是
+   * 注入的，剔除会连用户自己带的一起删
    */
   async function persistAndApply(currentTab, config) {
     await StorageHelper.setConfig(getRootDomain(), config);
 
     const { id: tabId, url } = currentTab;
-    const { isEnabled, params } = config;
+    const isActiveHere = isConfigActiveForURL(config, url);
 
     let appliedURL = url;
     let isApplied = true;
-    if (isEnabled) {
-      appliedURL = buildURLWithParamRules(url, params, PARAM_MODE.configOnly);
+    if (isActiveHere) {
+      appliedURL = buildURLWithParamRules(
+        url,
+        config.params,
+        PARAM_MODE.configOnly,
+      );
       ({ isApplied } = await applyURLToTab({
         tabId,
         oldURL: url,
@@ -71,19 +94,21 @@ export function createSaveConfig(deps) {
       });
     }
 
-    return isApplied;
+    return { isApplied, isActiveHere };
   }
 
-  function onSaved(config, isApplied) {
+  function onSaved(applyResult) {
+    const { isApplied, isActiveHere } = applyResult;
+
     store.markAllSaved();
     renderParams();
     setBaseline();
 
-    if (isApplied) {
-      showSaveResult(config.isEnabled ? "✓ 已应用" : "✓ 已保存", true);
+    if (!isApplied) {
+      showSaveResult("✓ 已保存（页面已跳转，请重开 popup）", true);
       return;
     }
-    showSaveResult("✓ 已保存（页面已跳转，请重开 popup）", true);
+    showSaveResult(isActiveHere ? "✓ 已应用" : "✓ 已保存", true);
   }
 
   async function saveConfig() {
@@ -101,11 +126,15 @@ export function createSaveConfig(deps) {
         return;
       }
 
-      const config = {
-        isEnabled: toggleEl.checked,
-        params: normalizeParams(store.list()),
-      };
-      onSaved(config, await persistAndApply(currentTab, config));
+      const config = readDraft();
+      const pathPatternError = await findPathPatternError(config.pathPattern);
+      if (pathPatternError) {
+        onInvalidPathPattern(pathPatternError);
+        showSaveResult("路径正则无效", false);
+        return;
+      }
+
+      onSaved(await persistAndApply(currentTab, config));
     } catch (e) {
       console.error("[search-sort] 保存配置失败：", e);
       showSaveResult("保存失败，请重试", false);

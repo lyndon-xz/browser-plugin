@@ -1,3 +1,5 @@
+import { toURLRegex } from "./path-rule.js";
+
 /*
  * 把域名配置编译成 declarativeNetRequest 动态规则：在主文档请求发出之前就把缺失的
  * 默认值补进 URL，页面从头带着它们加载——既不多发一次请求，也不刷新。
@@ -19,16 +21,41 @@ const isPlainHost = (rootDomain) => /^[a-z0-9.-]+$/.test(rootDomain);
 // regexFilter 走 RE2，元字符要转义
 const escapeForRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-function buildDomainRules(rootDomain, params, firstRuleId) {
+/**
+ * DNR 的 regexFilter 走 RE2，JS RegExp 能编译的它未必收（前后向断言、反向引用）。
+ * 而 updateDynamicRules 是整批原子提交，一条不收就没有任何域名的规则能下发成功，
+ * 所以 popup 保存前问一遍、background 下发前再兜一遍
+ */
+export async function isPathPatternSupportedByRules(pathPattern) {
+  const urlRegex = toURLRegex(pathPattern);
+  if (urlRegex === null) {
+    return true;
+  }
+
+  const { isSupported } = await chrome.declarativeNetRequest.isRegexSupported({
+    regex: urlRegex,
+    isCaseSensitive: true,
+  });
+  return isSupported;
+}
+
+function buildDomainRules(rootDomain, config, firstRuleId) {
+  const { pathPattern, params } = config;
   const defaulted = params.filter((param) => param.defaultValue != null);
   if (defaulted.length === 0) {
+    return [];
+  }
+
+  const pathURLRegex = toURLRegex(pathPattern);
+  // 配了路径却翻译不出来：宁可不注入，也不要把作用范围放大回整个域名
+  if (pathPattern !== null && pathURLRegex === null) {
     return [];
   }
 
   const condition = {
     requestDomains: [rootDomain],
     resourceTypes: ["main_frame"],
-    // 参数名区分大小写，?A= 与 ?a= 是两个参数
+    // 参数名与路径都区分大小写，?A= 与 ?a= 是两个参数
     isUrlFilterCaseSensitive: true,
   };
   const anyDefaultedKey = defaulted
@@ -36,6 +63,10 @@ function buildDomainRules(rootDomain, params, firstRuleId) {
     .join("|");
 
   return [
+    /*
+     * skip 不带路径条件：路径不命中时 inject 本来就不匹配，多放行一条无妨，
+     * 而 regexFilter 一条只能写一个，路径与「参数已存在」拼不到一起
+     */
     {
       id: firstRuleId,
       priority: RULE_PRIORITY.skip,
@@ -58,7 +89,9 @@ function buildDomainRules(rootDomain, params, firstRuleId) {
           },
         },
       },
-      condition,
+      condition: pathURLRegex
+        ? { ...condition, regexFilter: pathURLRegex }
+        : condition,
     },
   ];
 }
@@ -78,9 +111,7 @@ export function buildDefaultParamRules(configs) {
     if (!config.isEnabled || !isPlainHost(rootDomain)) {
       continue;
     }
-    rules.push(
-      ...buildDomainRules(rootDomain, config.params, rules.length + 1),
-    );
+    rules.push(...buildDomainRules(rootDomain, config, rules.length + 1));
   }
 
   return rules;

@@ -1,6 +1,10 @@
-import { buildDefaultParamRules } from "./utils/default-param-rules.js";
+import {
+  buildDefaultParamRules,
+  isPathPatternSupportedByRules,
+} from "./utils/default-param-rules.js";
 import { extractRootDomain } from "./utils/domain.js";
 import { MESSAGE_ACTION } from "./utils/messages.js";
+import { isConfigActiveForURL } from "./utils/path-rule.js";
 import { isTabGoneError } from "./utils/runtime-error.js";
 import { StorageHelper } from "./utils/storage.js";
 import { replaceURLInTab } from "./utils/tab.js";
@@ -68,6 +72,12 @@ async function sortTabURL(tabId, url) {
   applyGeneration.set(tabId, generation);
   const isStale = () => applyGeneration.get(tabId) !== generation;
 
+  /*
+   * 先把上一轮的结论作废。路径也在判据里，同域换路径（SPA 里很常见）就能翻转结论，
+   * 等算完再覆盖的话，这段时间图标还在报上一个路径的结果
+   */
+  await updateIcon(tabId, ICON_STATE.inactive);
+
   try {
     const config = await readConfigForURL(url);
 
@@ -75,9 +85,11 @@ async function sortTabURL(tabId, url) {
       return;
     }
 
-    // 关掉开关后不再改 URL：分不清哪些参数是注入的，剔除会连用户自己带的一起删
-    if (!config?.isEnabled) {
-      await updateIcon(tabId, ICON_STATE.inactive);
+    /*
+     * 不在作用范围内（开关关掉，或路径不命中）时不动 URL：分不清哪些参数是注入的，
+     * 剔除会连用户自己带的一起删
+     */
+    if (!isConfigActiveForURL(config, url)) {
       return;
     }
 
@@ -96,8 +108,7 @@ async function sortTabURL(tabId, url) {
 
     await updateIcon(tabId, ICON_STATE.active);
   } catch (e) {
-    // 这一轮没判出结果，图标不能继续沿用上一轮的「已生效」
-    await updateIcon(tabId, ICON_STATE.inactive);
+    // 图标在开头就已经置灰，这里不必再动：没判出结果就停在「未生效」上
     console.error("[search-sort] 重排失败：", e);
   }
 }
@@ -115,7 +126,9 @@ async function updateIconForTab(tabId, url) {
     const config = await readConfigForURL(url);
     await updateIcon(
       tabId,
-      config?.isEnabled ? ICON_STATE.active : ICON_STATE.inactive,
+      isConfigActiveForURL(config, url)
+        ? ICON_STATE.active
+        : ICON_STATE.inactive,
     );
   } catch (e) {
     await updateIcon(tabId, ICON_STATE.inactive);
@@ -154,6 +167,28 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 /*
+ * 剔掉 DNR 不接受其路径正则的域名。updateDynamicRules 是整批原子提交，留一条不收的
+ * 就没有任何域名的规则能下发成功。popup 保存时已经拦过一遍，这里再兜一次——旧版本
+ * 写进去的、或手改 storage 进来的配置绕不过这道
+ */
+async function dropRuleUnsafeConfigs(configs) {
+  const checked = await Promise.all(
+    Object.entries(configs).map(async (entry) => {
+      const [rootDomain, config] = entry;
+      if (await isPathPatternSupportedByRules(config.pathPattern)) {
+        return entry;
+      }
+      console.warn(
+        `[search-sort] ${rootDomain} 的路径正则 DNR 不支持，已跳过它的默认值注入：`,
+        config.pathPattern,
+      );
+      return null;
+    }),
+  );
+  return Object.fromEntries(checked.filter((entry) => entry !== null));
+}
+
+/*
  * 动态规则整批重建，不做增量：规则完全由配置推导，重算一遍比维护「哪条对应哪个
  * 参数」更不容易错。规则本身持久保存，service worker 被回收也不受影响
  */
@@ -163,7 +198,7 @@ async function syncDefaultParamRules() {
     const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: existingRules.map((rule) => rule.id),
-      addRules: buildDefaultParamRules(configs),
+      addRules: buildDefaultParamRules(await dropRuleUnsafeConfigs(configs)),
     });
   } catch (e) {
     console.error("[search-sort] 下发默认值注入规则失败：", e);
