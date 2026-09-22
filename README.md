@@ -8,7 +8,7 @@
 | 插件        | 目录                            | 版本  | 做什么                                                                                         |
 | ----------- | ------------------------------- | ----- | ---------------------------------------------------------------------------------------------- |
 | exam-helper | [`exam-helper/`](./exam-helper) | 1.3.4 | 划词查题（题库匹配 + DeepSeek 兜底）；内置《Java 开发手册（黄山版）》L2 模拟考 / 快刷 / 错题本 |
-| search-sort | [`search-sort/`](./search-sort) | 2.1.0 | 按根域名重排 URL 查询参数、注入缺失的默认值                                                    |
+| search-sort | [`search-sort/`](./search-sort) | 3.1.0 | 按根域名重排 URL 查询参数，请求发出前注入缺失的默认值                                          |
 | review-lens | [`review-lens/`](./review-lens) | 2.1.0 | 在 GitLab MR 每条代码讨论旁开抽屉，同屏看评论、回复与两个版本的代码                            |
 
 ## 📦 安装
@@ -53,17 +53,17 @@ DeepSeek API 密钥在 popup 里填写，仅存本机 `chrome.storage.local`。�
 
 ### 📖 简介
 
-以**根域名**为配置单位，在页面加载或前端路由变化时，按预设顺序重排 URL 查询参数，并为缺失的参数注入默认值。子域名共享同一套配置；IPv4 / IPv6 主机则以完整主机名隔离。
+以**根域名**为配置单位做两件事：**主文档请求发出之前**把缺失的默认值补进 URL（`declarativeNetRequest` 动态规则，站点从头就读到，不多发请求也不刷新），页面加载完与前端路由变化时再按预设顺序重排查询参数（`replaceState`，只换地址栏）。子域名共享同一套配置；IPv4 / IPv6 主机则以完整主机名隔离。
 
 ### ✨ 特性
 
-- **参数排序**：按配置顺序重排查询串；参数集合不变时用 `replaceState` 原地软更新，不整页刷新
-- **默认值注入**：为配置中缺失的参数写入默认值，此时通过整页导航带上新参数
-- **拖拽排序**：弹窗里拖动 `≡` 手柄调整参数顺序
-- **站点开关**：每个根域名可独立启用 / 停用，工具栏图标随状态切换
-- **两种参数模式**：保存时以配置为准剔除配置外参数（`config-only`）；页面自动应用时保留配置外现有参数（`keep-extra`）
-- **SPA 兼容**：改写 `pushState` / `replaceState` 并监听 `popstate`；扩展重载后孤儿 content script 会自动还原
-- **防刷新循环**：同一 URL 在 5 秒窗口内最多导航 2 次即放弃
+- **默认值请求前注入**：打开页面时由 `declarativeNetRequest` 在请求发出前补上缺失的默认值，只有一次文档请求，不刷新；URL 上已经带了其中任意一个默认值参数时整条放行，绝不覆盖用户自己传的值
+- **自动排序零刷新**：页面加载完成与前端路由变化时按配置顺序重排查询串，走 content script 的 `replaceState`，页面不重新加载、不新增历史记录
+- **保存即时生效**：点「保存并应用」会立刻对当前页注入默认值并剔除配置外参数，这一次通过整页导航应用
+- **拖拽排序**：弹窗里拖动 `≡` 手柄，或点左侧序号直接输入目标位置
+- **站点开关**：每个根域名可独立启用 / 停用，工具栏图标随状态切换；停用后不再改动 URL
+- **两种参数模式**：自动排序只重排、保留配置外参数（`sort-only`）；保存时以配置为准剔除配置外参数并注入默认值（`config-only`）
+- **SPA 兼容**：改写 `pushState` / `replaceState` 并监听 `popstate`；content script 就绪后主动上报当前 URL，不依赖两端时序；扩展重载后孤儿脚本会自动还原
 
 ### 🛠️ 使用
 
@@ -119,7 +119,7 @@ browser-plugin/
 │   ├── background.js
 │   ├── content/          # bootstrap + entry：SPA 路由跟踪与 URL 改写
 │   ├── popup/            # 参数列表、拖拽、保存
-│   └── utils/            # domain、url、tab、storage、messages
+│   └── utils/            # domain、url、tab、storage、messages、runtime-error、default-param-rules
 └── review-lens/          # GitLab MR 代码对照
     ├── manifest.json
     ├── background.js
