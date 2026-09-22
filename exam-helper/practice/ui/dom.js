@@ -7,6 +7,7 @@ export const ui = {
   resumeCard: document.getElementById("resume-card"),
   resumeDesc: document.getElementById("resume-desc"),
   wrongCountEl: document.getElementById("wrong-count"),
+  wrongBookRow: document.getElementById("wrong-book-row"),
   timerEl: document.getElementById("timer"),
   progressText: document.getElementById("progress-text"),
   answeredText: document.getElementById("answered-text"),

@@ -1,10 +1,22 @@
 import { EXAM_BANK } from "../../data/exam-bank.js";
-import { EXAM_MODES, PAPER_SOURCE } from "./constants.js";
-import { buildAiPaper } from "./ai-paper.js";
-
-const EXAM_QUESTIONS = EXAM_BANK.questions;
+import { alertDialog, closeDialog, confirmDialog } from "../ui/dialog.js";
+import { showPanel, ui } from "../ui/dom.js";
 import {
-  buildPaper,
+  resetGeneratingStatus,
+  showGenerating,
+  updateGeneratingProgress,
+  updateGeneratingStatus,
+} from "../ui/generating.js";
+import {
+  refreshStartPanel,
+  renderReview,
+  showResultSummary,
+} from "../ui/render-panels.js";
+import { renderQuestion, updateMixTag } from "../ui/render-question.js";
+import { buildAiPaper } from "./ai-paper.js";
+import { EXAM_MODES, PAPER_SOURCE } from "./constants.js";
+import { buildBankPaper } from "./coverage/bank.js";
+import {
   buildPaperFromIds,
   durationForCount,
   formatDuration,
@@ -12,20 +24,6 @@ import {
   passCorrectForCount,
   shuffle,
 } from "./engine.js";
-import { PracticeStorage } from "./storage.js";
-import { showPanel, ui } from "../ui/dom.js";
-import {
-  refreshStartPanel,
-  renderReview,
-  showResultSummary,
-} from "../ui/render-panels.js";
-import {
-  resetGeneratingStatus,
-  showGenerating,
-  updateGeneratingProgress,
-  updateGeneratingStatus,
-} from "../ui/generating.js";
-import { renderQuestion, updateMixTag } from "../ui/render-question.js";
 import {
   answersFromRecord,
   clearSession,
@@ -33,6 +31,9 @@ import {
   persistSession,
   resetAnswers,
 } from "./state.js";
+import { PracticeStorage } from "./storage.js";
+
+const EXAM_QUESTIONS = EXAM_BANK.questions;
 
 function stopTimer() {
   if (exam.timerId != null) {
@@ -113,27 +114,29 @@ async function updateWrongBook(items) {
   await PracticeStorage.saveWrongQuestions([...byId.values()]);
 }
 
-function warnAiPaperQuality(meta, questionCount) {
+async function warnAiPaperQuality(meta, questionCount) {
   if (!meta || exam.paperSource !== PAPER_SOURCE.ai) {
     return;
   }
   if (meta.ai === 0) {
-    window.alert(
-      `AI 出题未能生成有效题目，本卷 ${questionCount} 题均由预置题库补齐。请检查 popup 中的 API 密钥与网络。`,
-    );
+    await alertDialog({
+      title: "AI 出题未生效",
+      message: `本卷 ${questionCount} 题均由预置题库补齐。请检查 popup 中的 API 密钥与网络。`,
+    });
     return;
   }
   if (meta.preset > 0) {
-    window.alert(
-      `AI 组卷部分失败：本卷 AI ${meta.ai} 题，预置题库补齐 ${meta.preset} 题。`,
-    );
+    await alertDialog({
+      title: "AI 组卷部分失败",
+      message: `本卷 AI ${meta.ai} 题，预置题库补齐 ${meta.preset} 题。`,
+    });
   }
 }
 
 async function preparePaper(mode, paperSource) {
   if (paperSource === PAPER_SOURCE.preset) {
     exam.paperMeta = { ai: 0, preset: mode.questionCount };
-    return buildPaper(EXAM_QUESTIONS, mode.questionCount);
+    return buildBankPaper(mode.questionCount);
   }
 
   showGenerating(true);
@@ -152,20 +155,79 @@ async function preparePaper(mode, paperSource) {
   }
 }
 
+/**
+ * 组卷失败后的补救：AI 组卷可退回题库，题库组卷本身失败则只能重试。
+ * 返回是否已经拿到可用的卷子。
+ */
+async function recoverFromPaperFailure(error, mode) {
+  const message = error?.message ?? "组卷失败";
+  if (exam.paperSource === PAPER_SOURCE.preset) {
+    await alertDialog({ title: "题库组卷失败", message });
+    return false;
+  }
+
+  const shouldUseFallback = await confirmDialog({
+    title: "AI 组卷失败",
+    message: `${message}\n是否改用预置题库（${EXAM_QUESTIONS.length} 题）组卷？`,
+    confirmText: "用题库组卷",
+  });
+  if (!shouldUseFallback) {
+    return false;
+  }
+
+  try {
+    exam.paper = await buildBankPaper(mode.questionCount);
+  } catch (fallbackError) {
+    await alertDialog({
+      title: "题库组卷失败",
+      message: fallbackError?.message ?? "组卷失败",
+    });
+    return false;
+  }
+  exam.paperMeta = { ai: 0, preset: mode.questionCount };
+  exam.paperSource = PAPER_SOURCE.preset;
+  return true;
+}
+
+/**
+ * 作废上一卷。exam 是模块单例、不随面板切换重置，
+ * 组卷失败或被新一轮组卷取代时，旧卷会与新的 paperSource 互不匹配地留在里面。
+ */
+function discardCurrentPaper() {
+  exam.paper = [];
+  exam.paperMeta = null;
+  exam.lastResult = null;
+  resetAnswers();
+  clearPaperQuestionsForAssist();
+}
+
+// 组卷与交卷都有 await，期间入口仍可点；两条流程并发会各自写一批覆盖进度与错题
+let isFlowRunning = false;
+
 export async function startMode(modeId) {
   const mode = EXAM_MODES[modeId];
-  if (!mode) {
+  if (!mode || isFlowRunning) {
     return;
   }
+  isFlowRunning = true;
+  try {
+    await enterMode(mode, modeId);
+  } finally {
+    isFlowRunning = false;
+  }
+}
+
+async function enterMode(mode, modeId) {
   exam.currentMode = mode;
-  clearPaperQuestionsForAssist();
+  discardCurrentPaper();
 
   if (modeId === "wrong") {
     const wrongQuestions = shuffle(await PracticeStorage.getWrongQuestions());
     if (!wrongQuestions.length) {
-      window.alert(
-        "错题本还是空的。先完成一套模拟考或快刷，交卷后会自动收录错题。",
-      );
+      await alertDialog({
+        title: "错题本还是空的",
+        message: "先完成一套模拟考或快刷，交卷后会自动收录错题。",
+      });
       return;
     }
     exam.paper = buildPaperFromIds(
@@ -184,18 +246,12 @@ export async function startMode(modeId) {
 
   try {
     exam.paper = await preparePaper(mode, exam.paperSource);
-    warnAiPaperQuality(exam.paperMeta, mode.questionCount);
+    await warnAiPaperQuality(exam.paperMeta, mode.questionCount);
   } catch (error) {
-    const message = error?.message ?? "组卷失败";
-    const useFallback = window.confirm(
-      `${message}\n\n是否改用预置题库（${EXAM_QUESTIONS.length} 题）组卷？`,
-    );
-    if (!useFallback) {
+    const isRecovered = await recoverFromPaperFailure(error, mode);
+    if (!isRecovered) {
       return;
     }
-    exam.paper = buildPaper(EXAM_QUESTIONS, mode.questionCount);
-    exam.paperMeta = { ai: 0, preset: mode.questionCount };
-    exam.paperSource = PAPER_SOURCE.preset;
   }
 
   exam.passThreshold = mode.passCorrect;
@@ -248,23 +304,43 @@ export async function resumeSession() {
   void persistSession();
 }
 
+// 自动交卷与手动交卷可能并发落到同一份卷子上，重复结算会二次写错题本
+let isSubmitting = false;
+
 export async function submitExam(isAuto) {
-  if (!exam.paper.length) {
+  if (!exam.paper.length || isSubmitting) {
     return;
   }
-  if (!isAuto) {
+  if (isAuto) {
+    // 倒计时可能在手动交卷的确认框开着时归零，遮罩没有别的出口可关
+    closeDialog();
+  } else {
     const unanswered = exam.paper.filter(
       ({ question }) => !exam.answers.get(question.id)?.length,
     ).length;
-    const tip =
-      unanswered > 0
-        ? `还有 ${unanswered} 题未作答，确定交卷吗？`
-        : "确定交卷吗？";
-    if (!window.confirm(tip)) {
+    const isConfirmed = await confirmDialog({
+      title: "确定交卷吗？",
+      message:
+        unanswered > 0
+          ? `还有 ${unanswered} 题未作答，交卷后不能再修改。`
+          : "交卷后不能再修改答案。",
+      confirmText: "交卷",
+    });
+    // 等待确认期间可能已被自动交卷结算掉
+    if (!isConfirmed || isSubmitting || !exam.paper.length) {
       return;
     }
   }
 
+  isSubmitting = true;
+  try {
+    await gradeAndShowResult();
+  } finally {
+    isSubmitting = false;
+  }
+}
+
+async function gradeAndShowResult() {
   stopTimer();
   exam.lastResult = gradePaper(exam.paper, exam.answers, exam.passThreshold);
   await updateWrongBook(exam.lastResult.items);
@@ -280,5 +356,10 @@ export async function submitExam(isAuto) {
 export async function discardSession() {
   clearPaperQuestionsForAssist();
   await clearSession(ui.resumeCard);
+  await refreshStartPanel();
+}
+
+export async function clearWrongBook() {
+  await PracticeStorage.saveWrongQuestions([]);
   await refreshStartPanel();
 }

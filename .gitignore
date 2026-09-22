@@ -15,8 +15,8 @@ build/
 .eslintcache
 *.tsbuildinfo
 
-# 测试
-coverage/
+# 测试：只忽略根目录的覆盖率报告，不误伤业务目录（如 practice/core/coverage/）
+/coverage/
 
 # 日志
 *.log

@@ -5,13 +5,14 @@ import {
   loadMaterialText,
 } from "../../shared/utils/material-chunks.js";
 import { normalize } from "../../shared/utils/matcher.js";
-import { buildPaper, shuffle } from "./engine.js";
+import { markBankQuestionsUsed } from "./coverage/bank.js";
 import {
   loadChunkCoverage,
   markChunksUsed,
   orderChunkIndices,
-  resetChunkCoverage,
-} from "./material-coverage.js";
+  startChunkNewRound,
+} from "./coverage/material.js";
+import { buildPaper, shuffle } from "./engine.js";
 
 const EXAM_QUESTIONS = EXAM_BANK.questions;
 const QUESTIONS_PER_CALL = 2;
@@ -71,16 +72,16 @@ export async function buildAiPaper({ count, onProgress, onStatus }) {
   }
 
   const coverageBefore = await loadChunkCoverage();
-  let { order, roundReset } = orderChunkIndices(
+  const { order, startsNewRound } = orderChunkIndices(
     chunks.length,
     coverageBefore.used,
   );
-  if (roundReset) {
-    await resetChunkCoverage();
+  if (startsNewRound) {
+    await startChunkNewRound();
     onStatus?.("本轮已覆盖全部规约，开始新一轮");
   }
 
-  const usedBeforeSet = new Set(roundReset ? [] : coverageBefore.used);
+  const usedBeforeSet = new Set(startsNewRound ? [] : coverageBefore.used);
   const generated = [];
   const chunksThisPaper = new Set();
   let nextSlot = 0;
@@ -134,13 +135,18 @@ export async function buildAiPaper({ count, onProgress, onStatus }) {
 
   report();
   const final = pool.slice(0, count);
+  // 用题库原题补齐的部分用户同样做过，与主动选题库组卷记同一份覆盖
+  await markBankQuestionsUsed(
+    final.filter((q) => q.source !== "ai-material").map((q) => q.id),
+  );
+
   const meta = {
     ai: final.filter((q) => q.source === "ai-material").length,
     preset: final.filter((q) => q.source !== "ai-material").length,
     chunksThisPaper: chunkIndices.length,
     coverageUsed: coverageAfter.used.length,
     coverageTotal: chunks.length,
-    roundReset,
+    startsNewRound,
   };
 
   return {

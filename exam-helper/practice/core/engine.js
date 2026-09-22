@@ -80,6 +80,18 @@ export function buildPaper(questions, count = L2_EXAM.questionCount) {
   return toPaperSlots(picked);
 }
 
+/** 题库组卷：优先抽没考过的题，凑不满一卷时用考过的补齐 */
+export function buildPaperPreferringUnused(questions, count, usedIds) {
+  const unused = questions.filter((question) => !usedIds.has(question.id));
+  if (unused.length >= count) {
+    return buildPaper(unused, count);
+  }
+
+  const used = questions.filter((question) => usedIds.has(question.id));
+  const filler = sampleByTypeRatio(used, count - unused.length);
+  return buildPaper([...unused, ...filler], count);
+}
+
 /** 按 id 顺序组卷（续考 / 错题本），可传入已保存的选项顺序 */
 export function buildPaperFromIds(questions, ids, optionOrders = {}) {
   const byId = new Map(questions.map((q) => [q.id, q]));
