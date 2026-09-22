@@ -25,10 +25,7 @@ export function startInlineEdit(editRequest) {
 
   let isClosed = false;
 
-  /*
-   * 解绑 blur 并用 isClosed 守卫，避免 input.remove() 触发 blur 后重复执行
-   * （NotFoundError 根因）
-   */
+  // 解绑 blur 并用 isClosed 守卫：input.remove() 会再触发一次 blur，否则这里跑第二遍
   function close(shouldSave) {
     if (isClosed) {
       return;

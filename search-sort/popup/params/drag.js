@@ -8,9 +8,8 @@ const DRAGGING_CLASS = "dragging";
 const DROP_HINT_CLASS = "drag-over";
 
 /*
- * 浏览器默认把拖拽源节点（这里是 ≡ 手柄）截成跟随光标的拖拽影像，看上去是一个
- * 脱离行的小重影。换成 1×1 透明图抹掉它，拖拽反馈交给 .dragging 与插入线。
- * 提前加载：dragstart 时图还没解码完，Chrome 会退回默认影像
+ * 浏览器默认把拖拽源节点截成跟随光标的影像，换成 1×1 透明图抹掉它，拖拽反馈交给
+ * .dragging 与插入线。提前加载：dragstart 时图还没解码完，Chrome 会退回默认影像
  */
 const emptyDragImage = new Image();
 emptyDragImage.src =

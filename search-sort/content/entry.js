@@ -4,10 +4,6 @@ import { hasSameSearchParams } from "../utils/url.js";
 
 const URL_CHANGE_DEBOUNCE_MS = 100;
 
-/*
- * 改写 history 方法并监听 popstate，把页面内的 URL 变化上报给 background。
- * runSilently 供「我们自己改 URL」时借用：那次变化不该再上报回去
- */
 function createURLReporter() {
   const originalPushState = history.pushState;
   const originalReplaceState = history.replaceState;
@@ -16,11 +12,7 @@ function createURLReporter() {
   let isSilent = false;
   let isOrphaned = false;
 
-  /*
-   * 扩展被重新加载/更新后，已注入页面的 content script 变为孤儿，sendMessage 会抛
-   * "Extension context invalidated"。还原被改写的 history 方法并停止上报，
-   * 避免在第三方宿主页反复产生未捕获异常
-   */
+  // 扩展重载后本脚本变孤儿，还原改写过的 history 方法，免得在宿主页反复抛异常
   function release() {
     isOrphaned = true;
     history.pushState = originalPushState;
@@ -71,6 +63,7 @@ function createURLReporter() {
   return {
     reportNow: sendURLChange,
 
+    // 在 action 期间挂起上报：我们自己改的 URL 不该再报回 background
     runSilently(action) {
       isSilent = true;
       try {
@@ -87,7 +80,7 @@ function createURLReporter() {
   };
 }
 
-/** 接收 background 下发的重排结果，原地替换当前 URL */
+// 接收 background 下发的重排结果，原地替换当前 URL
 function createApplyReceiver(deps) {
   const { runSilently } = deps;
 
@@ -114,10 +107,7 @@ function createApplyReceiver(deps) {
     }
 
     runSilently(() => {
-      /*
-       * 只换 URL，保留当前 history entry 的 state——依赖 history.state 定位的
-       * SPA 路由（如 React Router 的 key/idx）被清空后前进后退会错乱
-       */
+      // 保留原 state：清空后，靠 history.state 定位的 SPA 路由前进后退会错乱
       window.history.replaceState(window.history.state, "", sortedURL);
     });
     return true;
@@ -166,9 +156,8 @@ export function init() {
   }
 
   /*
-   * 就绪后立刻上报当前 URL。重排要靠本脚本原地替换，而本脚本是 document_end 之后
-   * 动态 import 起来的，background 监听页面加载完成的那一刻往往还没注册上监听，
-   * 消息投递不到。由就绪方主动开口，才不依赖两边的时序
+   * 重排要靠本脚本原地替换，而它是 document_end 之后才动态 import 起来的，background
+   * 在页面加载完成那一刻往往还没注册上监听，消息投递不到，改由就绪方主动开口
    */
   void reporter.reportNow();
 

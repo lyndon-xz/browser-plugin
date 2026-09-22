@@ -1,7 +1,4 @@
-/*
- * content_scripts 里唯一的非 module 文件：MV3 不支持把 content script 声明成 module，
- * 主逻辑放在 ESM 模块里，这里只做引导与生命周期。
- */
+// MV3 不支持把 content script 声明成 module，主逻辑放在 ESM 里，这里只做引导
 (function () {
   "use strict";
 

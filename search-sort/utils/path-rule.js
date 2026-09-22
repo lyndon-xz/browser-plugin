@@ -1,13 +1,8 @@
 /*
- * 路径匹配规则：配置只在 pathname 命中这条正则时生效，留空表示整个域名都生效。
- *
- * 这条规则有两个消费方——background / popup 直接匹配 pathname，declarativeNetRequest
- * 的 regexFilter 只能匹配整条 URL。两者都从 compile() 的同一份结果出发，别处不再各自
- * 解读正则；否则「自动排序生效的页面」与「请求前注入默认值生效的页面」不是同一批。
- *
- * 为了能可靠翻译，写法上有两条硬约束，写不了的形态在保存前就被拦下：
- * - 必须以 / 开头，按路径起点对齐；要模糊匹配用 /.*search 这种写法
- * - ^ 与 $ 只能落在整条正则的两端，分支中间的锚点翻译不过去
+ * background / popup 直接匹配 pathname，DNR 的 regexFilter 只能匹配整条 URL，两边都从
+ * compile() 的同一份结果出发，否则两处生效的页面不是同一批。为了能翻译过去，写法上有两条
+ * 硬约束，写不了的形态在保存前就被拦下：必须以 / 开头，要模糊匹配用 /.*search 这种写法；
+ * ^ 与 $ 只能落在整条正则的两端，分支中间的锚点翻译不过去
  */
 
 // 主机段不含 /，紧跟其后的那个 / 必然是路径的第一个字符，路径边界由此钉死
@@ -27,11 +22,7 @@ export function normalizePathPattern(rawPattern) {
   return pattern === "" ? null : pattern;
 }
 
-/*
- * 扫一遍正则：去掉可省的开头 ^、认出结尾的 $、把裸 . 换成 [^?#]，并揪出中间的锚点。
- * 转义字符与字符类内部的内容不参与判定。
- * 校验、pathname 匹配、DNR 翻译都用它的结果，三处不会对同一个 pattern 有两种理解
- */
+// 校验、pathname 匹配、DNR 翻译共用这一份结果，三处不会对同一个 pattern 有两种理解
 function compile(pattern) {
   const body = pattern.startsWith("^") ? pattern.slice(1) : pattern;
   if (!body.startsWith("/")) {
@@ -99,7 +90,7 @@ export function validatePathPattern(pattern) {
 }
 
 /**
- * pathname 是否命中。pattern 为空表示不限路径；
+ * pathname 是否命中；pattern 为空表示不限路径。
  * 编译不了时按不命中处理——宁可不生效，也不要在没打算配的页面上改 URL
  */
 export function matchesPathPattern(pathname, pattern) {
@@ -119,10 +110,7 @@ export function matchesPathPattern(pathname, pattern) {
   }
 }
 
-/**
- * 翻译成 DNR regexFilter 用的整条 URL 正则。
- * 不限路径、或写法不合法时返回 null——调用方据此决定不下发规则，而不是放宽到整个域名
- */
+/** 翻译成 DNR regexFilter 用的整条 URL 正则；返回 null 表示别下发规则，而非放宽到整个域名 */
 export function toURLRegex(pattern) {
   if (pattern == null) {
     return null;
@@ -138,10 +126,7 @@ export function toURLRegex(pattern) {
   return `${URL_HOST_FRAME}(?:${compiled})${pathEnd}`;
 }
 
-/**
- * 配置对这个 URL 生效吗。图标、自动排序、保存时应用都用这一处判定，
- * 生效条件将来再加一维时不必三处各改一遍
- */
+/** 配置对这个 URL 生效吗；图标、自动排序、保存时应用共用这一处判定 */
 export function isConfigActiveForURL(config, url) {
   if (!config?.isEnabled) {
     return false;

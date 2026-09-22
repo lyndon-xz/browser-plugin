@@ -15,12 +15,8 @@ import {
 } from "./utils/url.js";
 
 /*
- * service worker 负责 popup / content script 做不到的事：读 storage、按域名配置
- * 重排 URL、更新标签页图标，并串行化同一 tab 上的并发应用。
- *
- * 默认值的注入交给 declarativeNetRequest：在主文档请求发出前改写 URL，站点从头
- * 就读到默认值，不必加载完再改一次 URL 把页面重新请求一遍。
- * 页面加载完与 SPA 路由变化时只重排顺序——参数集没变，原地 replaceState 即可
+ * 默认值由 declarativeNetRequest 在主文档请求发出前注入，站点首个请求就读到默认值，
+ * 不必等加载完再改 URL 重新请求一遍；页面就绪与 SPA 路由变化只原地重排顺序
  */
 
 const ICON_SIZES = [16, 32, 48, 128];
@@ -72,10 +68,7 @@ async function sortTabURL(tabId, url) {
   applyGeneration.set(tabId, generation);
   const isStale = () => applyGeneration.get(tabId) !== generation;
 
-  /*
-   * 先把上一轮的结论作废。路径也在判据里，同域换路径（SPA 里很常见）就能翻转结论，
-   * 等算完再覆盖的话，这段时间图标还在报上一个路径的结果
-   */
+  // 路径也在判据里，同域换路径就能翻转结论，先作废免得图标停在上一个路径的结果
   await updateIcon(tabId, ICON_STATE.inactive);
 
   try {
@@ -85,10 +78,7 @@ async function sortTabURL(tabId, url) {
       return;
     }
 
-    /*
-     * 不在作用范围内（开关关掉，或路径不命中）时不动 URL：分不清哪些参数是注入的，
-     * 剔除会连用户自己带的一起删
-     */
+    // 不生效时不动 URL：分不清哪些参数是注入的，剔除会连用户自己带的一起删
     if (!isConfigActiveForURL(config, url)) {
       return;
     }
@@ -114,8 +104,8 @@ async function sortTabURL(tabId, url) {
 }
 
 /*
- * popup 保存后只刷新图标：URL 已由 popup 按新配置应用过，这里再算一遍拿到的是
- * 保存前的旧 URL，会把用户刚剔除的参数加回去
+ * 只刷图标不重排：URL 已由 popup 按新配置应用过，这里读到的是保存前的旧 URL，
+ * 再算一遍会把用户刚剔除的参数加回去
  */
 async function updateIconForTab(tabId, url) {
   if (!isSupportedURL(url)) {
@@ -148,10 +138,7 @@ const HANDLERS = {
 };
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  /*
-   * 开始加载就先置未生效：这一轮还没判出结果，留着上一个 URL 算出的
-   * active 图标会让用户以为当前页正在被重排
-   */
+  // 这一轮还没判出结果，留着上一个 URL 算出的 active 图标会误报
   if (changeInfo.status === "loading") {
     void updateIcon(tabId, ICON_STATE.inactive);
     return;
@@ -166,11 +153,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   applyGeneration.delete(tabId);
 });
 
-/*
- * 剔掉 DNR 不接受其路径正则的域名。updateDynamicRules 是整批原子提交，留一条不收的
- * 就没有任何域名的规则能下发成功。popup 保存时已经拦过一遍，这里再兜一次——旧版本
- * 写进去的、或手改 storage 进来的配置绕不过这道
- */
+// popup 保存时已拦过一遍，这里兜住旧版本写进去的、手改 storage 进来的配置
 async function dropRuleUnsafeConfigs(configs) {
   const checked = await Promise.all(
     Object.entries(configs).map(async (entry) => {
@@ -189,8 +172,8 @@ async function dropRuleUnsafeConfigs(configs) {
 }
 
 /*
- * 动态规则整批重建，不做增量：规则完全由配置推导，重算一遍比维护「哪条对应哪个
- * 参数」更不容易错。规则本身持久保存，service worker 被回收也不受影响
+ * 整批重建不做增量：规则完全由配置推导，重算比维护「哪条对应哪个参数」更不易错。
+ * 动态规则本身持久保存，service worker 被回收也不受影响
  */
 async function syncDefaultParamRules() {
   try {

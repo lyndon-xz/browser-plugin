@@ -14,7 +14,7 @@ const SAVE_FEEDBACK_MS = 1500;
 const SUCCESS_CLASS = "success";
 const FAILED_CLASS = "failed";
 
-/** 路径正则要两个消费方都用得上：结构上编译得出来，DNR 那边也得收 */
+// 路径正则要两个消费方都用得上：结构上编译得出来，DNR 那边也得收
 async function findPathPatternError(pathPattern) {
   const { isValid, reason } = validatePathPattern(pathPattern);
   if (!isValid) {
@@ -59,9 +59,8 @@ export function createSaveConfig(deps) {
   }
 
   /*
-   * 默认值注入与剔除配置外参数只在这里发生——参数集一变必须整页导航站点才读得到。
-   * 不在作用范围内（开关关掉，或当前页路径不命中）时不动 URL：分不清哪些参数是
-   * 注入的，剔除会连用户自己带的一起删
+   * 默认值注入与剔除配置外参数只在这里发生：参数集一变必须整页导航，站点才读得到。
+   * 不在作用范围内时不动 URL，免得把用户自己带的参数一起剔掉
    */
   async function persistAndApply(currentTab, config) {
     await StorageHelper.setConfig(getRootDomain(), config);

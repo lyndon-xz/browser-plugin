@@ -10,10 +10,7 @@ import { PATH_HINT_STATE } from "./ui-state.js";
 
 const INVALID_PATTERN_HINT_MS = 1000;
 
-/*
- * 正则这种东西写完看不出对不对，所以直接拿当前页的路径试一遍、把结论摆出来；
- * 写错了也就地说清错在哪，不用等保存被拦下才知道
- */
+// 正则写完看不出对不对，就地拿当前页路径试一遍给结论，不用等保存被拦下才知道
 const PATH_RULE_HINT = {
   anyPath: { text: "全部路径", state: PATH_HINT_STATE.neutral },
   matched: { text: "本页命中", state: PATH_HINT_STATE.matched },

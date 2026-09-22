@@ -1,9 +1,8 @@
 import { toURLRegex } from "./path-rule.js";
 
 /*
- * 把域名配置编译成 declarativeNetRequest 动态规则：在主文档请求发出之前就把缺失的
- * 默认值补进 URL，页面从头带着它们加载——既不多发一次请求，也不刷新。
- * 规则由 background 下发（依赖 chrome.declarativeNetRequest）
+ * 把域名配置编译成 declarativeNetRequest 动态规则：在主文档请求发出之前就把缺失的默认值
+ * 补进 URL，页面从头带着它们加载——既不多发一次请求，也不刷新
  */
 
 // 同一请求里高优先级规则胜出，skip 因此能挡住 inject
@@ -23,8 +22,7 @@ const escapeForRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * DNR 的 regexFilter 走 RE2，JS RegExp 能编译的它未必收（前后向断言、反向引用）。
- * 而 updateDynamicRules 是整批原子提交，一条不收就没有任何域名的规则能下发成功，
- * 所以 popup 保存前问一遍、background 下发前再兜一遍
+ * 而 updateDynamicRules 是整批原子提交，一条不收就没有任何域名的规则能下发成功
  */
 export async function isPathPatternSupportedByRules(pathPattern) {
   const urlRegex = toURLRegex(pathPattern);

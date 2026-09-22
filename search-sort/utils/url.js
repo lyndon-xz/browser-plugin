@@ -3,7 +3,7 @@ export function isSupportedURL(url) {
   return Boolean(url) && url.startsWith("http");
 }
 
-/*
+/**
  * 默认值「未设置」的唯一关口：空串与缺失一律归一为 null，
  * 之后各处只判 null，不必各自再防一遍 "" 与 undefined
  */

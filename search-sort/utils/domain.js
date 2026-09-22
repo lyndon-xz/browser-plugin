@@ -1,7 +1,6 @@
 /*
  * 常见的二级 TLD。这份清单按定义不可能穷尽，未收录的后缀会让同后缀的不同站点
- * （如 a.example.cn 与 b.example.cn）落到同一个配置键上、配置互相串用；
- * popup 顶部展示的就是实际生效的配置键，串用时用户能直接看见
+ * （如 a.example.cn 与 b.example.cn）落到同一个配置键上、配置互相串用
  */
 const SECOND_LEVEL_TLDS = new Set([
   "com.cn",
@@ -39,9 +38,8 @@ const SECOND_LEVEL_TLDS = new Set([
 ]);
 
 /*
- * IPv4（四段纯数字）或 IPv6（含 ":"/方括号）等非域名主机：直接用完整
- * hostname 作为配置键，避免按末两段截取导致不同 IP（如 10.0.0.1 与 20.0.0.1）
- * 键相互碰撞、配置被套用到无关站点
+ * IPv4（四段纯数字）与 IPv6（含 ":"/方括号）直接用完整 hostname 作配置键：按末两段
+ * 截取会让不同 IP（如 10.0.0.1 与 20.0.0.1）撞到同一个键上
  */
 function isIpHost(hostname) {
   if (hostname.includes(":") || hostname.includes("[")) {

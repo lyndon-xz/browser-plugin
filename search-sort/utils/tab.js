@@ -2,10 +2,7 @@ import { MESSAGE_ACTION } from "./messages.js";
 import { isTabGoneError } from "./runtime-error.js";
 import { hasSameSearchParams } from "./url.js";
 
-/*
- * 标签页操作相关工具。依赖 chrome.tabs，仅供 background / popup 使用，
- * 不应注入到内容脚本（content script）环境。
- */
+// 依赖 chrome.tabs，只能在 background / popup 里用，content script 环境取不到
 
 function isStillSourceURL(currentURL, sourceURL) {
   return currentURL === sourceURL || hasSameSearchParams(currentURL, sourceURL);

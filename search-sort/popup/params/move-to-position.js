@@ -4,7 +4,7 @@ import { startInlineEdit } from "./inline-edit.js";
 
 const INVALID_POSITION_HINT_MS = 600;
 
-/** 解析用户输入的目标位置（1 起），不是 1..maxPosition 范围内的整数就返回 null */
+// 目标位置从 1 起算，不是 1..maxPosition 内的整数就返回 null
 function parsePosition(raw, maxPosition) {
   if (!/^\d+$/.test(raw)) {
     return null;
