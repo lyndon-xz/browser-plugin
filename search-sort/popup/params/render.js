@@ -11,8 +11,7 @@ const DELETE_BTN_CLASS = "delete-btn";
 /** 参数列表渲染与排序（拖拽、序号跳转、改值、删除） */
 export function createParamsRenderer(deps) {
   const { store, elements, onDirty } = deps;
-  const { paramsListEl, addSection, stateBox, stateTitle, stateDesc } =
-    elements;
+  const { paramsListEl, stateBox, stateTitle, stateDesc } = elements;
 
   function showState(stateText) {
     const { title, desc } = stateText;
@@ -54,10 +53,9 @@ export function createParamsRenderer(deps) {
 
     if (params.length === 0) {
       showState({
-        title: "当前 URL 没有查询参数",
-        desc: "可以手动新增，给参数设上默认值",
+        title: "这个页面没有查询参数",
+        desc: "点「新增参数」手动加一个，并给它设上默认值",
       });
-      addSection.classList.remove(HIDDEN_CLASS);
       return;
     }
 
@@ -129,14 +127,16 @@ export function createParamsRenderer(deps) {
       item.appendChild(dragHandle);
       item.appendChild(key);
       item.appendChild(value);
-      item.appendChild(deleteBtn);
 
+      // 「新」排在删除按钮之前，每行都以删除按钮收尾，右端对齐才不会参差
       if (param.isNew) {
         const badge = document.createElement("span");
         badge.className = "new-badge";
         badge.textContent = "新";
         item.appendChild(badge);
       }
+
+      item.appendChild(deleteBtn);
 
       dragSort.bindItem(item);
       paramsListEl.appendChild(item);

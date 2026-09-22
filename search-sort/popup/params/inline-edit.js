@@ -1,5 +1,8 @@
 import { HIDDEN_CLASS } from "../ui-state.js";
 
+// 行内输入框的共同外观由这里统一挂上，各调用方只管尺寸与校验
+const INLINE_INPUT_CLASS = "inline-input";
+
 /**
  * 行内编辑的通用生命周期：隐藏展示节点、就地插入 input、回车或失焦提交、Esc 取消。
  * parse 返回 { value } 表示提交，返回 null 表示丢弃——无效或没变化都算丢弃，
@@ -14,6 +17,7 @@ export function startInlineEdit(editRequest) {
   }
 
   const input = createInput();
+  input.classList.add(INLINE_INPUT_CLASS);
   target.classList.add(HIDDEN_CLASS);
   target.before(input);
   input.focus();

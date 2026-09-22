@@ -1,38 +1,51 @@
 :root {
-  --primary: #4a90d9;
-  --primary-hover: #3a7bc8;
-  --primary-soft: #e8f0fe;
-  --primary-faint: #f8fbff;
-  --primary-shadow: rgb(74 144 217 / 15%);
-  --success: #4caf50;
-  --danger: #e74c3c;
-  /* 派生自 --danger，跟着源色走；相对颜色语法 Chrome 119+ 支持 */
-  --danger-soft: rgb(from var(--danger) r g b / 12%);
-  --text-primary: #1a1a1a;
-  --text-secondary: #666;
-  --text-muted: #999;
-  --text-placeholder: #bbb;
-  --text-on-primary: #fff;
-  --surface: #fff;
-  --surface-muted: #fafafa;
-  --surface-subtle: #f0f0f0;
-  --surface-subtle-hover: #e0e0e0;
-  --divider: #f0f0f0;
-  --border: #eee;
-  --border-strong: #ddd;
-  --icon-muted: #ccc;
-  --switch-off: #ccc;
-  --badge-bg: #fff3e0;
-  --badge-text: #f57c00;
-  --badge-text-hover: #e65100;
-  --font-mono: "SF Mono", "Fira Code", monospace;
+  /* 蓝色是工具栏图标的身份色，沿用但压深一档，别让大面积浅蓝把数据盖过去 */
+  --primary: #2f6fd0;
+  --primary-hover: #2559ad;
+  --primary-soft: #e9f1fd;
+  --primary-faint: #f6f9fe;
 
-  /* 反复出现的排版尺度，改弹窗密度时只动这几处 */
-  --space-inline: 20px;
-  --space-block: 12px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
+  /* 从 --primary 派生，换主色时跟着走；相对颜色语法 Chrome 119+ 支持 */
+  --primary-line: rgb(from var(--primary) r g b / 22%);
+
+  /* 未保存是「待办」不是「出错」，单独一档暖色，不与 danger 混用 */
+  --pending: #c77700;
+  --pending-hover: #a76300;
+  --pending-soft: #fff4e2;
+
+  --success: #2fa36b;
+  --danger: #d64545;
+  --danger-soft: rgb(from var(--danger) r g b / 10%);
+
+  /* 中性色按「墨色深浅」一条轴排，不再各处临时取灰 */
+  --ink: #14161a;
+  --ink-soft: #5b6472;
+  --ink-faint: #8a93a1;
+  --ink-ghost: #b6bdc8;
+  --ink-on-primary: #fff;
+
+  --surface: #fff;
+  --surface-muted: #f7f8fa;
+  --surface-sunken: #f1f3f6;
+  --border-strong: #d4d8e0;
+  --divider: #eef0f4;
+  --switch-off: #cfd4dd;
+
+  --space-inline: 18px;
+  --space-block: 10px;
+  --radius-sm: 5px;
+
+  /* 行内控件的高度：换入的输入框与它替换掉的胶囊必须等高，否则会撑高整行 */
+  --control-h: 18px;
+
+  --font-xs: 11px;
   --font-sm: 12px;
+  --font-md: 13px;
+  --font-lg: 14px;
+
+  /* 参数名、默认值、正则、序号都是数据，一律等宽；界面文案用系统 UI 字体 */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", "Fira Code", ui-monospace, monospace;
 }
 
 * {
@@ -42,15 +55,15 @@
 }
 
 body {
-  width: 520px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 13px;
-  color: var(--text-primary);
+  width: 420px;
+  font-family: var(--font-ui);
+  font-size: var(--font-md);
+  color: var(--ink);
 }
 
 /*
  * Chrome 给 popup 的高度上限是 600px。把上限收在这里并用 flex 列布局，
- * 让参数列表成为唯一的滚动区：参数再多，头部与底部操作区也始终可见。
+ * 让参数列表成为唯一的滚动区：参数再多，头部与操作栏也始终可见。
  * 不收的话超出上限后整个 popup 会再套一层滚动条，保存按钮被推到看不见的地方
  */
 .popup {
@@ -60,91 +73,114 @@ body {
   background: var(--surface);
 }
 
-.header {
+/* 身份行：正在配的是哪个域名，以及这个域名开没开 */
+.identity {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  padding: 16px var(--space-inline);
-  border-bottom: 1px solid var(--divider);
+  padding: 12px var(--space-inline);
 }
 
-.header-left {
+.identity-main {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
 }
 
 .domain {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: var(--font-lg);
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.identity-role {
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  color: var(--ink-faint);
+}
+
+/* 作用范围：域名之下再按 pathname 正则收窄，命中与否就地给结论 */
+.path-rule {
+  display: flex;
+  flex-shrink: 0;
+  gap: 10px;
+  align-items: center;
+  padding: var(--space-block) var(--space-inline);
+  background: var(--surface-muted);
+  border-top: 1px solid var(--divider);
+  border-bottom: 1px solid var(--divider);
+}
+
+.path-rule-label {
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  color: var(--ink-soft);
+}
+
+.path-rule-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
   font-size: var(--font-sm);
-  color: var(--text-secondary);
-}
-
-/* Toggle Switch */
-.toggle-wrapper {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-  cursor: pointer;
-}
-
-.toggle-input {
-  width: 0;
-  height: 0;
-  opacity: 0;
-}
-
-.toggle-slider {
-  position: absolute;
-  inset: 0;
-  background: var(--switch-off);
-  border-radius: 12px;
-  transition: background 0.2s;
-}
-
-.toggle-slider::after {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  content: "";
+  color: var(--ink);
   background: var(--surface);
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
-  transition: transform 0.2s;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
-.toggle-input:checked + .toggle-slider {
-  background: var(--success);
+.path-rule-input::placeholder {
+  font-family: var(--font-ui);
+  color: var(--ink-ghost);
 }
 
-.toggle-input:checked + .toggle-slider::after {
-  transform: translateX(20px);
+.path-rule-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-line);
 }
 
-.toggle-input:focus-visible + .toggle-slider {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+.path-rule-input.error {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+.path-rule-hint {
+  flex-shrink: 0;
+  min-width: 68px;
+  font-size: var(--font-xs);
+  color: var(--ink-faint);
+  text-align: right;
+}
+
+.path-rule-hint[data-state="matched"] {
+  color: var(--success);
+}
+
+.path-rule-hint[data-state="unmatched"] {
+  color: var(--pending);
+}
+
+.path-rule-hint[data-state="invalid"] {
+  color: var(--danger);
 }
 
 /*
- * Params List
- * 高度不写死：撑到 .popup 的上限为止，之后由 min-height: 0 让它收缩、内部滚动。
- * border-bottom 把滚动区收口，否则截断处的半行与下方操作区贴在一起，
- * 看起来像新增表单盖在列表上
+ * 参数列表
+ * 高度不写死：撑到 .popup 的上限为止，之后由 min-height: 0 让它收缩、内部滚动
  */
 .params-list {
   min-height: 0;
-  padding: var(--space-block) var(--space-inline);
   overflow-y: auto;
-  border-bottom: 1px solid var(--divider);
 }
 
 /*
@@ -161,34 +197,37 @@ body {
 }
 
 .params-list::-webkit-scrollbar-thumb:hover {
-  background: var(--icon-muted);
+  background: var(--ink-ghost);
 }
 
+/* 行之间用分隔线而不是卡片间距：同样高度能多放三四行 */
 .param-item {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
-  padding: 10px 12px;
-  margin-bottom: 6px;
+
+  /*
+   * 行高锁死。行内编辑会把展示节点换成 input，两者自然高度差几像素就会撑高这一行，
+   * 连带整列和弹窗一起抖。锁住之后换入什么都不影响布局
+   */
+  height: 33px;
+  padding: 0 var(--space-inline);
   user-select: none;
-  background: var(--surface-muted);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  transition:
-    background 0.15s,
-    border-color 0.15s,
-    box-shadow 0.15s;
+  border-bottom: 1px solid var(--divider);
+  transition: background 0.12s;
 }
 
 .param-item:last-child {
-  margin-bottom: 0;
+  border-bottom: none;
+}
+
+.param-item:hover {
+  background: var(--surface-muted);
 }
 
 .param-item.dragging {
   background: var(--primary-soft);
-  border-color: var(--primary);
-  box-shadow: 0 4px 12px var(--primary-shadow);
-  opacity: 0.8;
+  opacity: 0.75;
 }
 
 /* 插入线用 inset 阴影画，改 border 宽度会让整列抖 1px */
@@ -196,43 +235,61 @@ body {
   box-shadow: inset 0 2px 0 var(--primary);
 }
 
+/*
+ * 行内编辑：在原处长出一个小输入框。不用下划线——那条线在密排的列表里会跟
+ * 行分隔线打架，看着像画错了；实心边框加白底才读得出「这一格现在能打字」
+ */
+.inline-input {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  color: var(--ink);
+  outline: none;
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+}
+
+/* 默认的蓝底选中盖在浅蓝输入框上会糊成一片 */
+.inline-input::selection {
+  color: var(--ink-on-primary);
+  background: var(--primary);
+}
+
 .param-index {
   flex-shrink: 0;
-  min-width: 28px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-align: center;
+  min-width: 26px;
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-ghost);
+  text-align: right;
   cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition:
-    color 0.15s,
-    background 0.15s;
+  transition: color 0.15s;
 }
 
+.param-item:hover .param-index {
+  color: var(--ink-faint);
+}
+
+/* 只换颜色不铺底：这一格只有 26px 宽，填色块在数字列里像个突兀的标记 */
 .param-index:hover {
   color: var(--primary);
-  background: var(--primary-soft);
 }
 
+/* 位置填错了只把数字变红：这一格只有 26px 宽，填底色会变成一块突兀的色斑 */
 .param-index.error {
   color: var(--danger);
-  background: var(--danger-soft);
 }
 
+/* 宽度与静态序号一致，进入编辑时这一行不会横向抖一下 */
 .param-index-input {
-  flex-shrink: 0;
-  width: 36px;
-  padding: 2px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-primary);
+  width: 26px;
+  padding: 1px 3px;
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
   text-align: center;
   appearance: textfield;
   -moz-appearance: textfield;
-  outline: none;
-  border: none;
-  border-bottom: 1.5px solid var(--primary);
 }
 
 .param-index-input::-webkit-outer-spin-button,
@@ -244,9 +301,19 @@ body {
 
 .drag-handle {
   flex-shrink: 0;
-  font-size: 16px;
-  color: var(--text-placeholder);
+  font-size: var(--font-lg);
+  line-height: 1;
+  color: var(--ink-ghost);
   cursor: grab;
+  transition: color 0.15s;
+}
+
+.param-item:hover .drag-handle {
+  color: var(--ink-soft);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .param-key {
@@ -255,20 +322,23 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-size: var(--font-md);
+  color: var(--ink);
   white-space: nowrap;
 }
 
 .param-value {
   flex-shrink: 0;
-  max-width: 88px;
-  padding: 2px 8px;
+  max-width: 200px;
+  height: var(--control-h);
+  padding: 0 8px;
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: var(--font-mono);
   font-size: var(--font-sm);
+
+  /* 用 line-height 居中而不是 flex：flex 容器里的文字用不了 text-overflow */
+  line-height: var(--control-h);
   color: var(--primary);
   white-space: nowrap;
   cursor: pointer;
@@ -276,27 +346,29 @@ body {
   border-radius: var(--radius-sm);
 }
 
+/*
+ * 没设默认值的行不常驻占位符：十几行「—」排下来会在右侧堆出一列假信息，
+ * 真有默认值的那几行反而被淹没。悬停才露出，点它就能填
+ */
 .param-value.empty {
-  color: var(--text-placeholder);
+  color: var(--ink-faint);
   background: transparent;
+  opacity: 0;
+  transition: opacity 0.12s;
 }
 
-.param-value.empty:hover {
-  color: var(--text-muted);
-  background: var(--surface-subtle);
+.param-item:hover .param-value.empty,
+.param-value.empty:focus-visible {
+  background: var(--surface-sunken);
+  opacity: 1;
 }
 
+/* 尺寸对齐它替换掉的那个默认值胶囊：高度一致才不会把行撑高，位置也不跳 */
 .param-value-input {
-  flex-shrink: 0;
-  width: 80px;
-  padding: 2px 6px;
-  font-family: var(--font-mono);
+  width: 150px;
+  height: var(--control-h);
+  padding: 0 7px;
   font-size: var(--font-sm);
-  color: var(--text-primary);
-  outline: none;
-  background: transparent;
-  border: none;
-  border-bottom: 1.5px solid var(--primary);
 }
 
 .delete-btn {
@@ -304,43 +376,138 @@ body {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  font-size: 14px;
-  color: var(--icon-muted);
+  width: 18px;
+  height: 18px;
+  font-size: var(--font-lg);
+  line-height: 1;
+  color: var(--ink-ghost);
   cursor: pointer;
   border-radius: 50%;
-  transition: color 0.15s;
+  opacity: 0;
+  transition:
+    color 0.15s,
+    opacity 0.15s;
+}
+
+.param-item:hover .delete-btn,
+.delete-btn:focus-visible {
+  opacity: 1;
 }
 
 .delete-btn:hover {
   color: var(--danger);
+  background: var(--danger-soft);
 }
 
 .new-badge {
   flex-shrink: 0;
   padding: 1px 5px;
   font-size: 10px;
-  color: var(--badge-text);
-  background: var(--badge-bg);
+  color: var(--pending);
+  background: var(--pending-soft);
   border-radius: 3px;
 }
 
-/* Add Section */
-.add-section {
+/* 新增表单：一行放完，展开时不把列表挤走太多 */
+.add-form {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
   padding: var(--space-block) var(--space-inline);
+  background: var(--primary-faint);
+  border-top: 1px solid var(--divider);
+}
+
+.add-label {
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  color: var(--ink-soft);
+}
+
+.add-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: var(--font-sm);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.add-input::placeholder {
+  font-family: var(--font-ui);
+  color: var(--ink-ghost);
+}
+
+.add-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-line);
+}
+
+.add-input.error {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+.btn-cancel,
+.btn-confirm {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  font-family: var(--font-ui);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-sm);
+}
+
+.btn-cancel {
+  color: var(--ink-soft);
+  background: var(--surface-sunken);
+}
+
+.btn-cancel:hover {
+  background: var(--border-strong);
+}
+
+.btn-confirm {
+  color: var(--ink-on-primary);
+  background: var(--primary);
+}
+
+.btn-confirm:hover {
+  background: var(--primary-hover);
+}
+
+/* 操作栏：新增与保存并作一行，省下原来单独一段的高度留给列表 */
+.action-bar {
+  display: flex;
+  flex-shrink: 0;
+  gap: 12px;
+  align-items: center;
+  padding: var(--space-block) var(--space-inline);
+  border-top: 1px solid var(--divider);
+}
+
+.add-section {
+  flex-shrink: 0;
 }
 
 .add-btn {
-  width: 100%;
-  padding: 10px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  text-align: center;
+  padding: 8px 12px;
+  font-family: var(--font-ui);
+  font-size: var(--font-sm);
+  color: var(--ink-soft);
   cursor: pointer;
   background: transparent;
   border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   transition:
     border-color 0.15s,
     color 0.15s;
@@ -351,112 +518,29 @@ body {
   border-color: var(--primary);
 }
 
-/* Add Form */
-.add-form {
-  padding: 12px;
-  margin: var(--space-block) var(--space-inline);
-  background: var(--primary-faint);
-  border: 1px dashed var(--primary);
-  border-radius: var(--radius-md);
-}
-
-.add-form-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.add-form-row:last-child {
-  margin-bottom: 0;
-}
-
-.add-label {
-  flex-shrink: 0;
-  width: 36px;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.add-input {
+.save-hint {
   flex: 1;
   min-width: 0;
-  padding: 8px 10px;
-  font-family: var(--font-mono);
-  font-size: var(--font-sm);
-  outline: none;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  transition: border-color 0.15s;
-}
-
-.add-input:focus {
-  border-color: var(--primary);
-}
-
-.add-input.error {
-  border-color: var(--danger);
-}
-
-.add-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 10px;
-}
-
-.btn-cancel {
-  padding: 6px 16px;
-  font-size: var(--font-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  background: var(--surface-subtle);
-  border: none;
-  border-radius: var(--radius-sm);
-}
-
-.btn-cancel:hover {
-  background: var(--surface-subtle-hover);
-}
-
-.btn-confirm {
-  padding: 6px 16px;
-  font-size: var(--font-sm);
-  color: var(--text-on-primary);
-  cursor: pointer;
-  background: var(--primary);
-  border: none;
-  border-radius: var(--radius-sm);
-}
-
-.btn-confirm:hover {
-  background: var(--primary-hover);
-}
-
-/* Footer */
-.footer {
-  padding: 16px var(--space-inline);
-  border-top: 1px solid var(--divider);
-}
-
-.save-hint {
-  margin-bottom: 10px;
-  font-size: var(--font-sm);
-  line-height: 1.5;
-  color: var(--badge-text);
-  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--font-xs);
+  color: var(--pending);
+  white-space: nowrap;
 }
 
 .save-btn {
-  width: 100%;
-  padding: 12px;
-  font-size: 14px;
+  flex-shrink: 0;
+  min-width: 120px;
+  padding: 9px 16px;
+  margin-left: auto;
+  font-family: var(--font-ui);
+  font-size: var(--font-md);
   font-weight: 500;
-  color: var(--text-on-primary);
+  color: var(--ink-on-primary);
   cursor: pointer;
   background: var(--primary);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   transition: background 0.2s;
 }
 
@@ -465,18 +549,17 @@ body {
 }
 
 .save-btn:disabled {
-  color: var(--text-muted);
+  color: var(--ink-faint);
   cursor: default;
-  background: var(--surface-subtle);
+  background: var(--surface-sunken);
 }
 
 .save-btn.dirty {
-  background: var(--badge-text);
-  box-shadow: 0 0 0 2px var(--badge-bg);
+  background: var(--pending);
 }
 
 .save-btn.dirty:hover {
-  background: var(--badge-text-hover);
+  background: var(--pending-hover);
 }
 
 .save-btn.success {
@@ -487,23 +570,74 @@ body {
   background: var(--danger);
 }
 
-/* State Box：无参数 / 页面不支持 / 读取失败共用的占位说明 */
+/* 无参数 / 页面不支持 / 读取失败共用的占位说明 */
 .state-box {
-  padding: 32px 28px;
+  flex-shrink: 0;
+  padding: 36px var(--space-inline);
   text-align: center;
 }
 
 .state-title {
-  font-size: 13px;
+  font-size: var(--font-md);
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--ink-soft);
 }
 
 .state-desc {
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: var(--font-sm);
-  line-height: 1.7;
-  color: var(--text-placeholder);
+  line-height: 1.6;
+  color: var(--ink-ghost);
+}
+
+/* Toggle Switch */
+.toggle-wrapper {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.toggle-input {
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--switch-off);
+  border-radius: 11px;
+  transition: background 0.2s;
+}
+
+.toggle-slider::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  content: "";
+  background: var(--surface);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
+  transition: transform 0.2s;
+}
+
+.toggle-input:checked + .toggle-slider {
+  background: var(--success);
+}
+
+.toggle-input:checked + .toggle-slider::after {
+  transform: translateX(18px);
+}
+
+.toggle-input:focus-visible + .toggle-slider {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /*
@@ -511,10 +645,10 @@ body {
  * 把参数区与所有操作入口一并收起，只留说明——留一个点不动的灰按钮更让人困惑
  */
 .popup[data-state="blocked"] .toggle-wrapper,
+.popup[data-state="blocked"] .path-rule,
 .popup[data-state="blocked"] .params-list,
-.popup[data-state="blocked"] .add-section,
 .popup[data-state="blocked"] .add-form,
-.popup[data-state="blocked"] .footer {
+.popup[data-state="blocked"] .action-bar {
   display: none;
 }
 
@@ -522,15 +656,30 @@ body {
  * 配置还没从 storage 读出来：配置区不接受交互——这段窗口里的改动会被恢复出来的
  * 配置整体覆盖掉。只挡交互不隐藏，免得 popup 打开瞬间先闪一下空白
  */
+/*
+ * 有初始视觉状态的控件，在配置读出来之前先藏起来：开关的初始态是「关」，已启用的
+ * 域名会先画灰再滑成绿；路径输入框的空值也是一条结论（「整个域名都生效」），
+ * 两者都会先给出错的答案再跳变。留位不重排，读完直接以正确状态出现，
+ * 这段时间也接不到键盘输入，不会被随后的回填悄悄覆盖
+ */
 .popup[data-state="loading"] .toggle-wrapper,
+.popup[data-state="loading"] .path-rule {
+  visibility: hidden;
+}
+
 .popup[data-state="loading"] .params-list,
-.popup[data-state="loading"] .add-section,
-.popup[data-state="loading"] .add-form {
+.popup[data-state="loading"] .add-form,
+.popup[data-state="loading"] .action-bar {
   pointer-events: none;
   opacity: 0.5;
 }
 
-/* Utility */
 .hidden {
   display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }

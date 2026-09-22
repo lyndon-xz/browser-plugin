@@ -8,15 +8,26 @@
   <body>
     <!-- data-state="loading"：配置读出来之前配置区不可操作，由 popup.js 解除 -->
     <div class="popup" id="popup" data-state="loading">
-      <div class="header">
-        <div class="header-left">
-          <div class="title">search-sort</div>
-          <div class="domain" id="domain"></div>
+      <header class="identity">
+        <div class="identity-main">
+          <span class="domain" id="domain"></span>
+          <span class="identity-role">查询参数排序</span>
         </div>
-        <label class="toggle-wrapper">
+        <label class="toggle-wrapper" title="该域名是否启用">
           <input type="checkbox" id="toggle" class="toggle-input" />
           <span class="toggle-slider"></span>
         </label>
+      </header>
+
+      <div class="path-rule">
+        <span class="path-rule-label">路径</span>
+        <input
+          class="path-rule-input"
+          id="pathPattern"
+          spellcheck="false"
+          placeholder="留空 = 整个域名，如 /search"
+        />
+        <span class="path-rule-hint" id="pathPatternHint"></span>
       </div>
 
       <div class="params-list" id="paramsList"></div>
@@ -26,29 +37,21 @@
         <div class="state-desc" id="stateDesc"></div>
       </div>
 
-      <div class="add-section" id="addSection">
-        <div class="add-btn" id="addBtn">+ 新增参数</div>
-      </div>
-
       <div class="add-form hidden" id="addForm">
-        <div class="add-form-row">
-          <span class="add-label">Key</span>
-          <input class="add-input" id="addKey" placeholder="参数名" />
-        </div>
-        <div class="add-form-row">
-          <span class="add-label">Value</span>
-          <input class="add-input" id="addValue" placeholder="默认值（可选）" />
-        </div>
-        <div class="add-actions">
-          <button class="btn-cancel" id="addCancel">取消</button>
-          <button class="btn-confirm" id="addConfirm">添加</button>
-        </div>
+        <span class="add-label">参数</span>
+        <input class="add-input" id="addKey" placeholder="参数名" />
+        <input class="add-input" id="addValue" placeholder="默认值（可选）" />
+        <button class="btn-cancel" id="addCancel">取消</button>
+        <button class="btn-confirm" id="addConfirm">添加</button>
       </div>
 
-      <div class="footer">
-        <p class="save-hint hidden" id="saveHint">改动尚未生效，请点击保存</p>
+      <footer class="action-bar">
+        <div class="add-section" id="addSection">
+          <button class="add-btn" id="addBtn">+ 新增参数</button>
+        </div>
+        <p class="save-hint hidden" id="saveHint">有未保存改动</p>
         <button class="save-btn" id="saveBtn" disabled>保存并应用</button>
-      </div>
+      </footer>
     </div>
 
     <script type="module" src="popup.js"></script>

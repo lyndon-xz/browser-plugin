@@ -1,4 +1,5 @@
-import { flashInvalid } from "./flash-invalid.js";
+import { flashInvalid } from "../flash-invalid.js";
+
 import { startInlineEdit } from "./inline-edit.js";
 
 const INVALID_POSITION_HINT_MS = 600;
@@ -30,7 +31,6 @@ export function startMoveToPosition(moveRequest) {
       input.max = String(maxPosition);
       input.className = "param-index-input";
       input.value = String(currentPosition);
-      input.placeholder = "位置";
       return input;
     },
 

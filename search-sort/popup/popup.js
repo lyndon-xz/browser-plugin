@@ -3,9 +3,11 @@ import { isTabGoneError } from "../utils/runtime-error.js";
 import { StorageHelper } from "../utils/storage.js";
 import { isSupportedURL } from "../utils/url.js";
 
+import { readConfigDraft } from "./config-draft.js";
 import { bindAddParamForm } from "./params/add.js";
 import { createParamsRenderer } from "./params/render.js";
 import { createParamsStore } from "./params/store.js";
+import { createPathRuleField } from "./path-rule-field.js";
 import { createSaveConfig } from "./save/config.js";
 import { createDirtyState } from "./save/dirty-state.js";
 import { POPUP_STATE } from "./ui-state.js";
@@ -33,33 +35,54 @@ async function refreshCurrentTab() {
 }
 
 const toggleEl = document.getElementById("toggle");
+const pathInput = document.getElementById("pathPattern");
 const saveBtn = document.getElementById("saveBtn");
 const saveHint = document.getElementById("saveHint");
 
+const readDraft = () => readConfigDraft({ toggleEl, pathInput, store });
+
 const { syncDirtyState, setBaseline } = createDirtyState({
-  toggleEl,
   saveBtn,
   saveHint,
   popupEl,
-  store,
+  readDraft,
 });
 
 // Switch 只是 UI 状态，随保存按钮一起写入 storage，不单独触发任何动作
 toggleEl.addEventListener("change", syncDirtyState);
 
+function getPagePathname() {
+  const url = currentTab?.url;
+  if (!url) {
+    return "/";
+  }
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return "/";
+  }
+}
+
+const pathRuleField = createPathRuleField({
+  pathInput,
+  pathHint: document.getElementById("pathPatternHint"),
+  getPagePathname,
+  onDirty: syncDirtyState,
+});
+
 const paramsListEl = document.getElementById("paramsList");
-const addSection = document.getElementById("addSection");
 const stateBox = document.getElementById("stateBox");
 const stateTitle = document.getElementById("stateTitle");
 const stateDesc = document.getElementById("stateDesc");
 
 const { renderParams, showState } = createParamsRenderer({
   store,
-  elements: { paramsListEl, addSection, stateBox, stateTitle, stateDesc },
+  elements: { paramsListEl, stateBox, stateTitle, stateDesc },
   onDirty: syncDirtyState,
 });
 
 const addBtn = document.getElementById("addBtn");
+const addSection = document.getElementById("addSection");
 const addForm = document.getElementById("addForm");
 const addKey = document.getElementById("addKey");
 const addValue = document.getElementById("addValue");
@@ -83,12 +106,13 @@ bindAddParamForm({
 
 createSaveConfig({
   saveBtn,
-  toggleEl,
   store,
+  readDraft,
   refreshCurrentTab,
   getRootDomain: () => rootDomain,
   renderParams,
   setBaseline,
+  onInvalidPathPattern: pathRuleField.markInvalid,
 });
 
 function blockConfiguring(stateText) {
@@ -120,6 +144,9 @@ async function init() {
     domainEl.textContent = rootDomain;
 
     const savedConfig = await StorageHelper.getConfig(rootDomain);
+    // 没存过配置时也要走一遍：它负责把提示区从空白刷成「全部路径」
+    pathRuleField.setPattern(savedConfig?.pathPattern ?? null);
+
     if (savedConfig) {
       toggleEl.checked = savedConfig.isEnabled;
       store.replaceAll(savedConfig.params);

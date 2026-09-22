@@ -1,6 +1,6 @@
 import { emptyDefaultToNull } from "../../utils/url.js";
+import { flashInvalid } from "../flash-invalid.js";
 import { HIDDEN_CLASS } from "../ui-state.js";
-import { flashInvalid } from "./flash-invalid.js";
 
 const KEY_ERROR_HINT_MS = 1000;
 
