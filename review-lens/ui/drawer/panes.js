@@ -154,7 +154,7 @@ export function restoreScroll(root, wasAt) {
   }
 }
 
-/**
+/*
  * 滚到某一行并闪一下。class 靠 animationend 摘掉而不是 setTimeout：动画时长只留在
  * CSS 一处，也不会有抽屉关闭后仍在跑的定时器。
  */
@@ -213,10 +213,10 @@ export function flashLine(root, line, options = {}) {
 }
 
 /**
- * 两栏滚动同步。readSyncing 是取值函数而不是布尔：监听常驻，勾选状态在滚动那一刻才读——
- * 为这个开关重绘会把两侧滚动位置清回开头。isEchoing 挡住回弹，否则两侧互相触发。
+ * 绑定两栏同步滚动，返回解绑函数，重绘前须先调。readSyncing 是取值函数而不是布尔：
+ * 监听常驻，勾选状态在滚动那一刻才读——为这个开关重绘会把两侧滚动位置清回开头。
+ * isEchoing 挡住回弹，否则两侧互相触发。
  */
-/** 绑定两栏同步滚动；返回解绑函数，重绘前须先调 */
 export function linkScroll(panes, readSyncing) {
   const [a, b] = panes.querySelectorAll(`.${CODE_CLASS}`);
   if (!a || !b) {

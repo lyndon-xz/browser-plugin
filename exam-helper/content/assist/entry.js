@@ -1,4 +1,4 @@
-/**
+/*
  * 划词助手：选中文字 + ⌃⇧A → 题库 / AI。
  * 重模块懒加载，init 同步完成以便快捷键尽早生效。
  */
@@ -35,7 +35,7 @@ export function isAskShortcut(event) {
   return key === "a";
 }
 
-/** 练习页只匹配当前卷子；其它页面匹配预置题库 */
+// 练习页只匹配当前卷子；其它页面匹配预置题库
 async function loadBank() {
   const matcherMod = await import("../../shared/utils/matcher.js");
   const paperQs = window.__ehPaperQuestions;

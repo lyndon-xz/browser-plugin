@@ -1,7 +1,6 @@
-/**
- * 考试资料 + 题库一体入口。
- * L2 组卷：运行时从 material.txt 抽规约 → AI 出题（见 practice/core/ai-paper.js）。
- * 划词查题：预置 questions + 当前卷子 AI 题；未命中且有选项时走 AI 推理。
+/*
+ * 考试资料 + 题库一体入口。组卷时从 material.txt 抽规约让 AI 出题；
+ * 划词查题先查预置 questions 与当前卷子的 AI 题，未命中且有选项时走 AI 推理
  */
 import { EXAM_QUESTIONS } from "./questions.js";
 

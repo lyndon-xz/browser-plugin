@@ -1,4 +1,4 @@
-/**
+/*
  * 答案气泡：position:fixed 挂在 body，滚动时跟随选区锚点重算位置。
  */
 import { DESIGN_TOKENS_CSS } from "./tokens.js";

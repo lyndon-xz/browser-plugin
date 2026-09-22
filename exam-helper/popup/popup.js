@@ -1,4 +1,4 @@
-/** 弹窗：划词开关、练习场景选择、DeepSeek 密钥。 */
+// 弹窗：划词开关、练习场景选择、DeepSeek 密钥。
 import {
   DEFAULT_SCENARIO_ID,
   PRACTICE_SCENARIOS,

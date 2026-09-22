@@ -1,4 +1,4 @@
-/** 从《Java 开发手册》TXT 提取可出题的规约片段 */
+// 从《Java 开发手册》TXT 提取可出题的规约片段
 
 const RULE_LINE = /\d+\.【强制】|\d+\.【推荐】/;
 const MIN_CHUNK_LEN = 80;

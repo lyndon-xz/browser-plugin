@@ -111,7 +111,7 @@ export function createShell(request) {
     }
   }
 
-  /** 打开后把焦点收进抽屉，Tab 在抽屉内循环 */
+  // 打开后把焦点收进抽屉，Tab 在抽屉内循环
   function focusPanel(panel) {
     releaseFocusTrap?.();
     releaseFocusTrap = null;

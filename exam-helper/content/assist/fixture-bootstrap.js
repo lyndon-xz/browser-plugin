@@ -1,4 +1,4 @@
-/**
+/*
  * 验收页引导：扩展页无法注入 content script，在此直接加载助手。
  */
 import { runQuery } from "./entry.js";

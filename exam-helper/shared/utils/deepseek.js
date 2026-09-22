@@ -1,4 +1,4 @@
-/**
+/*
  * DeepSeek 请求体构造与响应解析。实际 fetch 在 background 执行，规避宿主页 CSP。
  */
 
@@ -10,7 +10,7 @@ const SYSTEM_PROMPT =
   '{"answer":["A","C"],"explain":"简短解析"}，' +
   "answer 为正确选项的大写字母数组，explain 为一句话解析。不要输出 JSON 以外的任何内容。";
 
-/** 规整答案字母：大写、过滤非 A-E、去重、排序。 */
+// 规整答案字母：大写、过滤非 A-E、去重、排序。
 function normalizeAnswer(arr) {
   const seen = new Set();
   for (const x of arr) {
@@ -20,7 +20,7 @@ function normalizeAnswer(arr) {
   return [...seen].sort();
 }
 
-/** 从任意文本中兜底提取答案字母（如“正确答案：BCD”）。 */
+// 从任意文本中兜底提取答案字母（如“正确答案：BCD”）。
 function extractLettersFromText(text) {
   const near = text.match(/答案[^A-E]{0,4}([A-E][A-E\s、,，]*)/);
   const seg = near ? near[1] : text;

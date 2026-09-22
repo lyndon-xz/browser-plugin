@@ -31,7 +31,7 @@ function collectOptionLines(root) {
   return found.sort((a, b) => a.charCodeAt(0) - b.charCodeAt(0)).slice(0, 6);
 }
 
-/** 容器里是否有多道带选项的题（整页 wrapper），不能再往上抓选项 */
+// 容器里是否有多道带选项的题（整页 wrapper），不能再往上抓选项
 function isMultiQuestionRoot(el) {
   const blocks = el.querySelectorAll(
     "article, .question-card, .card, [data-question]",

@@ -1,4 +1,4 @@
-/** 练习页入口：绑定事件并展示起始面板 */
+// 练习页入口：绑定事件并展示起始面板
 import "../../content/assist/page-assist.js";
 import { DEFAULT_SCENARIO_ID, getScenario } from "../../data/scenarios.js";
 import { EXAM_MODES } from "../core/constants.js";

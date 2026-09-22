@@ -1,4 +1,4 @@
-/** 组卷 loading 遮罩 */
+// 组卷 loading 遮罩
 
 let overlay = null;
 

@@ -1,6 +1,4 @@
-/*
- * service worker：快捷键、右键菜单、DeepSeek 代理、图标同步。
- */
+// service worker：快捷键、右键菜单、DeepSeek 代理、图标同步
 import {
   AI_GENERATE_TIMEOUT_MS,
   AI_REQUEST_TIMEOUT_MS,
@@ -62,7 +60,7 @@ async function syncEnabledState(enabled) {
   await syncEnabledVisuals(enabled);
 }
 
-/** 避免并发注册导致 duplicate id */
+// 避免并发注册导致 duplicate id
 let contextMenuReady = null;
 
 function ensureContextMenu() {
@@ -120,7 +118,7 @@ async function injectTrigger(tabId, world) {
   });
 }
 
-/** 普通页走 content script 消息；扩展自有页在 MAIN world 注入触发 */
+// 普通页走 content script 消息；扩展自有页在 MAIN world 注入触发
 async function triggerQueryOnTab(tab) {
   const tabId = tab?.id;
   if (tabId == null) {

@@ -1,4 +1,4 @@
-/**
+/*
  * 扩展自有页面（练习、验收等）加载划词助手。
  * chrome-extension:// 页面不会注入 content script，需在此显式 init。
  */
