@@ -8,7 +8,7 @@
 | 插件        | 目录                            | 版本  | 做什么                                                                                         |
 | ----------- | ------------------------------- | ----- | ---------------------------------------------------------------------------------------------- |
 | exam-helper | [`exam-helper/`](./exam-helper) | 1.3.4 | 划词查题（题库匹配 + DeepSeek 兜底）；内置《Java 开发手册（黄山版）》L2 模拟考 / 快刷 / 错题本 |
-| search-sort | [`search-sort/`](./search-sort) | 3.1.0 | 按根域名重排 URL 查询参数，请求发出前注入缺失的默认值                                          |
+| search-sort | [`search-sort/`](./search-sort) | 3.3.0 | 按根域名（可用路径正则收窄）重排 URL 查询参数，请求发出前注入缺失的默认值                      |
 | review-lens | [`review-lens/`](./review-lens) | 2.1.0 | 在 GitLab MR 每条代码讨论旁开抽屉，同屏看评论、回复与两个版本的代码                            |
 
 ## 📦 安装
@@ -53,10 +53,12 @@ DeepSeek API 密钥在 popup 里填写，仅存本机 `chrome.storage.local`。�
 
 ### 📖 简介
 
-以**根域名**为配置单位做两件事：**主文档请求发出之前**把缺失的默认值补进 URL（`declarativeNetRequest` 动态规则，站点从头就读到，不多发请求也不刷新），页面加载完与前端路由变化时再按预设顺序重排查询参数（`replaceState`，只换地址栏）。子域名共享同一套配置；IPv4 / IPv6 主机则以完整主机名隔离。
+以**根域名**（可再用路径正则收窄到具体页面）为配置单位做两件事：**主文档请求发出之前**把缺失的默认值补进 URL（`declarativeNetRequest` 动态规则，站点从头就读到，不多发请求也不刷新），页面加载完与前端路由变化时再按预设顺序重排查询参数（`replaceState`，只换地址栏）。子域名共享同一套配置；IPv4 / IPv6 主机则以完整主机名隔离。
 
 ### ✨ 特性
 
+- **路径正则收窄**：域名之下可再写一条 `pathname` 正则（如 `/search`、`/(list|detail)/\d+$`、模糊匹配用 `/.*detail`），只在命中的路径上生效；留空则整个域名生效。输入时直接拿当前页路径试一遍，实时提示命不命中或写法错在哪
+- **两个消费方同一份判定**：同一条路径正则既要在 JS 里匹配 `pathname`，又要翻译成 `declarativeNetRequest` 的 `regexFilter` 匹配整条 URL。两者出自同一次编译，因此「自动排序生效的页面」与「请求前注入生效的页面」必然是同一批；代价是写法有两条约束——必须以 `/` 开头、`^` 与 `$` 只能落在两端，写不了的形态在保存前就被拦下（含 Chrome 的 RE2 不收的写法）
 - **默认值请求前注入**：打开页面时由 `declarativeNetRequest` 在请求发出前补上缺失的默认值，只有一次文档请求，不刷新；URL 上已经带了其中任意一个默认值参数时整条放行，绝不覆盖用户自己传的值
 - **自动排序零刷新**：页面加载完成与前端路由变化时按配置顺序重排查询串，走 content script 的 `replaceState`，页面不重新加载、不新增历史记录
 - **保存即时生效**：点「保存并应用」会立刻对当前页注入默认值并剔除配置外参数，这一次通过整页导航应用
@@ -69,8 +71,9 @@ DeepSeek API 密钥在 popup 里填写，仅存本机 `chrome.storage.local`。�
 
 1. 打开任意 `http(s)` 页面，点击扩展图标（非 `http(s)` 页面会提示不支持）
 2. 弹窗顶部显示当前根域名，右侧开关控制该域名是否启用
-3. 编辑参数默认值、拖动排序、删除或新增参数
-4. 点「保存并应用」写入配置并立即重写当前标签页 URL
+3. 「路径」一栏可填 `pathname` 正则（以 `/` 开头），把生效范围收窄到某些页面；留空表示整个域名
+4. 编辑参数默认值、拖动排序、删除或新增参数
+5. 点「保存并应用」写入配置并立即重写当前标签页 URL
 
 配置保存在 `chrome.storage.local` 的 `configs` 字段，以根域名为键。
 
@@ -119,7 +122,7 @@ browser-plugin/
 │   ├── background.js
 │   ├── content/          # bootstrap + entry：SPA 路由跟踪与 URL 改写
 │   ├── popup/            # 参数列表、拖拽、保存
-│   └── utils/            # domain、url、tab、storage、messages、runtime-error、default-param-rules
+│   └── utils/            # domain、url、path-rule、tab、storage、messages、runtime-error、default-param-rules
 └── review-lens/          # GitLab MR 代码对照
     ├── manifest.json
     ├── background.js
