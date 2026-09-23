@@ -68,16 +68,12 @@ export async function refreshStartPanel() {
       "卷头「组卷 · AI / 预置」指开卷来源，与查答案标签无关。";
   }
 
-  const paperSource = await PracticeStorage.getPaperSource();
   if (ui.materialStatsEl) {
     const pdfUrl = chrome.runtime.getURL(EXAM_BANK.material.pdfPath);
-    const sourceNote =
-      paperSource === PAPER_SOURCE.ai
-        ? "AI 组卷优先未考片段"
-        : "题库组卷优先没考过的题";
-    ui.materialStatsEl.innerHTML = `依据：<a href="${pdfUrl}" target="_blank" rel="noopener">${escapeHtml(EXAM_BANK.material.title)}</a> · ${sourceNote}`;
+    // 措辞对两种组卷来源都成立：这行不随来源重渲染，跟着变就会与覆盖行对不上
+    ui.materialStatsEl.innerHTML = `依据：<a href="${pdfUrl}" target="_blank" rel="noopener">${escapeHtml(EXAM_BANK.material.title)}</a> · 组卷优先未考过的部分`;
   }
-  await refreshCoverageStats(Promise.resolve(paperSource));
+  await refreshCoverageStats();
   const wrongQuestions = await PracticeStorage.getWrongQuestions();
   ui.wrongCountEl.textContent =
     wrongQuestions.length > 0
