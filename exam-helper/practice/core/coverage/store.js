@@ -34,7 +34,7 @@ export function createCoverageStore(storageKey) {
     return next;
   }
 
-  /** 整轮考完后进入下一轮：清空已覆盖，轮次 +1 */
+  /** 整轮考完后进入下一轮：轮次 +1 */
   async function startNewRound() {
     const { total, rounds } = await load();
     const next = { used: [], total, rounds: rounds + 1 };
@@ -42,7 +42,7 @@ export function createCoverageStore(storageKey) {
     return next;
   }
 
-  /** 用户手动重置：清空已覆盖并回到第一轮，轮次不累加 */
+  /** 用户手动重置：轮次归 1，不像自动进轮那样累加 */
   async function resetProgress() {
     const { total } = await load();
     const next = { used: [], total, rounds: 1 };

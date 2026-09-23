@@ -26,7 +26,7 @@ import {
 } from "../ui/render-panels.js";
 import { renderQuestion } from "../ui/render-question.js";
 
-/**
+/*
  * 包出一个事件监听器：回调里的失败没有别的接管者，
  * 不接住就是静默的 unhandled rejection，界面停在旧数据上。
  */

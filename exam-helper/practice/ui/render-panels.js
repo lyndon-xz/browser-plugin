@@ -63,6 +63,7 @@ export async function refreshStartPanel() {
     ui.sourceFootnoteEl.innerHTML =
       "<strong>AI 组卷</strong>：优先抽尚未考过的手册片段，由 DeepSeek 推理出题；卷头与首页可见覆盖进度（需 popup 配 API 密钥）。" +
       `<strong>题库组卷</strong>：从内置 ${bank.total} 题优先抽没考过的，秒开。` +
+      "覆盖进度按交卷计，放弃的卷子不计入。" +
       "查答案：📚 答案匹配（已有题目）· 🤖 AI 推理（现场调用）。" +
       "卷头「组卷 · AI / 预置」指开卷来源，与查答案标签无关。";
   }

@@ -26,31 +26,28 @@ export async function getBankCoverageStats() {
 }
 
 /**
- * 题库组卷：避开本轮已考过的题，并把本卷考到的题记进覆盖进度。
- * 整套题库都考过时先开启新一轮，轮次在本卷记录成功之后才推进。
+ * 题库组卷：避开本轮已考过的题。
+ * 只读覆盖进度，不写——发卷不算考过，记录发生在交卷时。
  */
 export async function buildBankPaper(count) {
   const { used, total, usedCount } = await getBankCoverageStats();
+  // 整套题库都考过了，本卷从全量抽，新一轮等交卷时才落盘
   const isRoundCovered = total > 0 && usedCount >= total;
   const usedIds = new Set(isRoundCovered ? [] : used);
-
-  const paper = buildPaperPreferringUnused(EXAM_QUESTIONS, count, usedIds);
-  const paperIds = paper.map((slot) => slot.question.id);
-
-  if (isRoundCovered) {
-    await coverageStore.startNewRound();
-  }
-  await coverageStore.markUsed(
-    paperIds.filter((id) => Number.isInteger(id)),
-    EXAM_QUESTIONS.length,
-  );
-  return paper;
+  return buildPaperPreferringUnused(EXAM_QUESTIONS, count, usedIds);
 }
 
-/** AI 组卷用题库原题补齐时，这些题同样算考过 */
-export function markBankQuestionsUsed(questionIds) {
+/**
+ * 交卷后记下本卷考到的题库题。
+ * 上一轮已考满时，本卷属于新一轮，先推进轮次再记录。
+ */
+export async function markBankQuestionsUsed(questionIds) {
+  const { usedCount, total } = await getBankCoverageStats();
+  if (total > 0 && usedCount >= total) {
+    await coverageStore.startNewRound();
+  }
   return coverageStore.markUsed(
     questionIds.filter((id) => Number.isInteger(id)),
-    EXAM_QUESTIONS.length,
+    total,
   );
 }

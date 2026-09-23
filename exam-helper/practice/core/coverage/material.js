@@ -12,23 +12,26 @@ export function loadChunkCoverage() {
   return coverageStore.load();
 }
 
-export function markChunksUsed(chunkIndices, totalChunks) {
-  const valid = chunkIndices.filter(
-    (index) => index >= 0 && index < totalChunks,
+/**
+ * 交卷后记下本卷考到的手册片段。
+ * 上一轮已考满时，本卷属于新一轮，先推进轮次再记录。
+ */
+export async function markChunksUsed(chunkIndices, totalChunks) {
+  const { used } = await coverageStore.load();
+  if (totalChunks > 0 && used.length >= totalChunks) {
+    await coverageStore.startNewRound();
+  }
+  return coverageStore.markUsed(
+    chunkIndices.filter((index) => index >= 0 && index < totalChunks),
+    totalChunks,
   );
-  return coverageStore.markUsed(valid, totalChunks);
-}
-
-/** 手册片段全部考过，进入下一轮 */
-export function startChunkNewRound() {
-  return coverageStore.startNewRound();
 }
 
 export function resetChunkCoverage() {
   return coverageStore.resetProgress();
 }
 
-/** 未考片段优先；全部考过后自动开启新一轮。 */
+/** 未考片段优先；片段全部考过时一并告知该开新一轮 */
 export function orderChunkIndices(totalChunks, usedIndices) {
   const usedSet = new Set(usedIndices);
   const unused = [];

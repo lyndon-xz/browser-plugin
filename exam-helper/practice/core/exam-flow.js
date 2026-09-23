@@ -16,6 +16,7 @@ import { renderQuestion, updateMixTag } from "../ui/render-question.js";
 import { buildAiPaper } from "./ai-paper.js";
 import { EXAM_MODES, PAPER_SOURCE } from "./constants.js";
 import { buildBankPaper } from "./coverage/bank.js";
+import { recordPaperCoverage } from "./coverage/record.js";
 import {
   buildPaperFromIds,
   durationForCount,
@@ -155,7 +156,7 @@ async function preparePaper(mode, paperSource) {
   }
 }
 
-/**
+/*
  * 组卷失败后的补救：AI 组卷可退回题库，题库组卷本身失败则只能重试。
  * 返回是否已经拿到可用的卷子。
  */
@@ -189,7 +190,7 @@ async function recoverFromPaperFailure(error, mode) {
   return true;
 }
 
-/**
+/*
  * 作废上一卷。exam 是模块单例、不随面板切换重置，
  * 组卷失败或被新一轮组卷取代时，旧卷会与新的 paperSource 互不匹配地留在里面。
  */
@@ -201,7 +202,7 @@ function discardCurrentPaper() {
   clearPaperQuestionsForAssist();
 }
 
-// 组卷与交卷都有 await，期间入口仍可点；两条流程并发会各自写一批覆盖进度与错题
+// 组卷有多次 await，期间模式卡片仍可点；两条并发链会各自建一份卷子
 let isFlowRunning = false;
 
 export async function startMode(modeId) {
@@ -344,6 +345,12 @@ async function gradeAndShowResult() {
   stopTimer();
   exam.lastResult = gradePaper(exam.paper, exam.answers, exam.passThreshold);
   await updateWrongBook(exam.lastResult.items);
+  try {
+    await recordPaperCoverage(exam.paper.map(({ question }) => question));
+  } catch (error) {
+    // 覆盖进度只是辅助统计，记不上也要让用户看到成绩；下次交卷会再记一次
+    console.warn("[exam-helper] 覆盖进度记录失败：", error);
+  }
   clearPaperQuestionsForAssist();
   await clearSession(ui.resumeCard);
   await refreshStartPanel();

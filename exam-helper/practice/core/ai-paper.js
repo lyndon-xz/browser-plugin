@@ -5,13 +5,7 @@ import {
   loadMaterialText,
 } from "../../shared/utils/material-chunks.js";
 import { normalize } from "../../shared/utils/matcher.js";
-import { markBankQuestionsUsed } from "./coverage/bank.js";
-import {
-  loadChunkCoverage,
-  markChunksUsed,
-  orderChunkIndices,
-  startChunkNewRound,
-} from "./coverage/material.js";
+import { loadChunkCoverage, orderChunkIndices } from "./coverage/material.js";
 import { buildPaper, shuffle } from "./engine.js";
 
 const EXAM_QUESTIONS = EXAM_BANK.questions;
@@ -77,7 +71,6 @@ export async function buildAiPaper({ count, onProgress, onStatus }) {
     coverageBefore.used,
   );
   if (startsNewRound) {
-    await startChunkNewRound();
     onStatus?.("本轮已覆盖全部规约，开始新一轮");
   }
 
@@ -130,21 +123,14 @@ export async function buildAiPaper({ count, onProgress, onStatus }) {
     throw new Error("AI 出题失败，请检查 DeepSeek 密钥与网络");
   }
 
-  const chunkIndices = [...chunksThisPaper];
-  const coverageAfter = await markChunksUsed(chunkIndices, chunks.length);
-
   report();
   const final = pool.slice(0, count);
-  // 用题库原题补齐的部分用户同样做过，与主动选题库组卷记同一份覆盖
-  await markBankQuestionsUsed(
-    final.filter((q) => q.source !== "ai-material").map((q) => q.id),
-  );
-
   const meta = {
     ai: final.filter((q) => q.source === "ai-material").length,
     preset: final.filter((q) => q.source !== "ai-material").length,
-    chunksThisPaper: chunkIndices.length,
-    coverageUsed: coverageAfter.used.length,
+    chunksThisPaper: chunksThisPaper.size,
+    // 累计值是交卷前的，本卷要等交卷才计入
+    coverageUsed: startsNewRound ? 0 : coverageBefore.used.length,
     coverageTotal: chunks.length,
     startsNewRound,
   };

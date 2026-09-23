@@ -1,4 +1,4 @@
-// 页面内确认 / 提示弹窗，替代 window.confirm 与 window.alert
+/** 页面内确认 / 提示弹窗，替代 window.confirm 与 window.alert */
 
 import { escapeHtml } from "../../shared/utils/html.js";
 
